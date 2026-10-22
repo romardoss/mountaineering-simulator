@@ -784,7 +784,7 @@ Play flow (`FLOW`): `obstacle → hill → season → team → equipment → rea
 3. ICU MessageFormat; Ukrainian plurals `one/few/many/other`.
 4. Engine key namespaces: `event.*`, `reason.*`, `hint.*`, `knot.<id>.name|description`, `knot.msg.*`, `knot.rating.*`, `rating.*`, `context.*`, `category.*`, `control.*`, `cmd.*`, `rule.P*`, `summary.*`, `injury.*`, `factor.*`, `chain.*`, `anchor.*`, `action.*` (option labels), `actionkind.*`, `validate.*`, `term.*` (+ `.meaning`), `item.*`, `status.*`, `zone.*`, `outcome.*`, `method.*`, `season.*`, `mode.*`, `surface.*`, `route.*`, `anchorType.*`, `treeSize.*`, `preset.hill.*`, `kit.*`.
 5. Ukrainian phrasing keeps member names in the nominative («{member}: …»), because names are not declined.
-6. Default member names are Ukrainian in both locales.
+6. Default member names are Ukrainian in both locales: Саша, Рома, Єгор, Надя, Владік, Ксеня, Денис, Марго, Андрій, Світлана, Міша, Богдан (`DEFAULT_NAMES` in `app/store.ts`; «Випадково» picks from them).
 
 ---
 

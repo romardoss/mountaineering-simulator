@@ -21,7 +21,7 @@ import type { RollScript } from "../../src/engine/rng/rng";
 
 export const engine = createEngine(gameData);
 export const data = gameData;
-export const NAMES = ["Оксана", "Тарас", "Марія", "Богдан", "Ірина", "Андрій", "Соломія"];
+export const NAMES = ["Саша", "Рома", "Єгор", "Надя", "Владік", "Ксеня", "Денис"];
 
 export function team(n: number): MemberConfig[] {
   return Array.from({ length: n }, (_, i) => ({

@@ -40,7 +40,7 @@ export function go(name: RouteName, back?: RouteName) {
 
 // ---------------------------------------------------------------- draft scenario (configuration screens)
 
-export const DEFAULT_NAMES = ["Оксана", "Тарас", "Марія", "Богдан", "Ірина", "Андрій", "Соломія", "Остап", "Леся", "Микола"];
+export const DEFAULT_NAMES = ["Саша", "Рома", "Єгор", "Надя", "Владік", "Ксеня", "Денис", "Марго", "Андрій", "Світлана", "Міша", "Богдан"];
 
 export const SPRITE_ROWS = 7;
 
