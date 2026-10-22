@@ -1,0 +1,36 @@
+{
+  "adjacencyM": 2,
+  "knotRopeAllowanceM": 1,
+  "maxThingsPerCarabiner": 3,
+  "minStepSeconds": 5,
+  "maxMembersPerSegment": 1,
+  "angleBands": [
+    { "maxDeg": 15, "id": "gentle", "moveM": 6 },
+    { "maxDeg": 25, "id": "moderate", "moveM": 4 },
+    { "maxDeg": 35, "id": "steep", "moveM": 3 },
+    { "maxDeg": 45, "id": "very_steep", "moveM": 2 },
+    { "maxDeg": 90, "id": "extreme", "moveM": 1.5 }
+  ],
+  "moveModifiers": { "grabbingKnot": 0.7, "snow": 0.8, "mud": 0.8, "rock": 0.9, "uphill": 1.5 },
+  "weight": {
+    "comfortKg": 25,
+    "heavyKg": 30,
+    "maxKg": 35,
+    "heavyMoveFactor": 0.85,
+    "overMoveFactor": 0.7,
+    "overFallFactor": 1.3
+  },
+  "team": { "min": 2, "max": 7, "default": 5 },
+  "hill": {
+    "minTotalM": 10,
+    "maxTotalM": 300,
+    "steepWarnDeg": 35,
+    "steepWarnLenM": 25,
+    "sectionLengthM": [3, 60],
+    "angleDeg": [0, 55]
+  },
+  "unsafeDetachDeg": 25,
+  "unprotectedHintDeg": 25,
+  "staticLoadDeg": 35,
+  "safeGrabbingMaxDeg": 55
+}

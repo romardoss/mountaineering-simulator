@@ -1,0 +1,18 @@
+{
+  "attach": { "hand": 5, "lanyard_carabiner": 15, "grabbing_knot": 45 },
+  "clip": 15,
+  "tieKnot": 60,
+  "perControlKnot": 10,
+  "fixDoubled": 40,
+  "belay": 45,
+  "stopBelay": 10,
+  "move": { "base": 30, "perDegreeAbove": 1, "aboveDeg": 15 },
+  "makeBase": 120,
+  "command": 5,
+  "detach": { "attachment": 20, "untie": 30, "unclip": 20, "dismantle_base": 60, "coil": 60, "pull_down": 30, "untieExtraThinHitch": 60 },
+  "passPerItem": 10,
+  "maxPassItems": 3,
+  "pickupPerItem": 5,
+  "wear": 30,
+  "skip": 0
+}

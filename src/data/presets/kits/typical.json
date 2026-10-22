@@ -1,0 +1,45 @@
+{
+  "id": "typical",
+  "nameKey": "kit.typical",
+  "perMember": [
+    {
+      "type": "carabiner",
+      "as": "carried",
+      "count": 2,
+      "props": {
+        "locking": true,
+        "shape": "hms"
+      }
+    }
+  ],
+  "winterPerMember": [],
+  "team": [
+    {
+      "type": "rope",
+      "count": 2,
+      "props": {
+        "lengthM": 50,
+        "diameterMm": 10,
+        "kind": "dynamic"
+      },
+      "assign": "spread_heavy"
+    },
+    {
+      "type": "sling",
+      "count": 4,
+      "props": {
+        "lengthCm": 120
+      },
+      "assign": "first"
+    },
+    {
+      "type": "carabiner",
+      "count": 4,
+      "props": {
+        "locking": true,
+        "shape": "hms"
+      },
+      "assign": "first"
+    }
+  ]
+}

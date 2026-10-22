@@ -1,0 +1,71 @@
+{
+  "id": "pologyi-travianystyi",
+  "nameKey": "preset.hill.gentle",
+  "type": "hill",
+  "routeType": "ascent",
+  "startZoneM": 6,
+  "finishZoneM": 8,
+  "sections": [
+    {
+      "lengthM": 20,
+      "angleDeg": 10,
+      "surface": "grass"
+    },
+    {
+      "lengthM": 20,
+      "angleDeg": 15,
+      "surface": "grass"
+    },
+    {
+      "lengthM": 20,
+      "angleDeg": 20,
+      "surface": "grass"
+    }
+  ],
+  "trees": [
+    {
+      "id": "t1",
+      "s": 3,
+      "size": "large",
+      "kind": "deciduous"
+    },
+    {
+      "id": "t2",
+      "s": 26,
+      "size": "large",
+      "kind": "deciduous"
+    },
+    {
+      "id": "t3",
+      "s": 46,
+      "size": "small",
+      "kind": "conifer"
+    },
+    {
+      "id": "t4",
+      "s": 70,
+      "size": "large",
+      "kind": "conifer"
+    }
+  ],
+  "basePoints": [
+    {
+      "id": "bp_start",
+      "s": 3,
+      "anchorType": "tree",
+      "treeId": "t1"
+    },
+    {
+      "id": "bp_mid1",
+      "s": 26,
+      "anchorType": "tree",
+      "treeId": "t2"
+    },
+    {
+      "id": "bp_top",
+      "s": 70,
+      "anchorType": "tree",
+      "treeId": "t4"
+    }
+  ]
+}

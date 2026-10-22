@@ -1,0 +1,15 @@
+[
+  { "type": "rope", "nameKey": "item.rope", "icon": "icon_rope", "wearable": false, "defaults": { "lengthM": 50, "diameterMm": 10, "kind": "dynamic", "color": "#D93636" } },
+  { "type": "cord", "nameKey": "item.cord", "icon": "icon_cord", "wearable": false, "defaults": { "lengthM": 1.5, "diameterMm": 6, "color": "#FFD23F" } },
+  { "type": "sling", "nameKey": "item.sling", "icon": "icon_sling", "wearable": false, "defaults": { "lengthCm": 120, "color": "#5FA8F0" } },
+  { "type": "carabiner", "nameKey": "item.carabiner", "icon": "icon_carabiner_locking", "wearable": false, "defaults": { "locking": true, "shape": "hms" } },
+  { "type": "belay_device", "nameKey": "item.belay_device", "icon": "icon_belay_device_atc", "wearable": false, "defaults": { "model": "atc" } },
+  { "type": "harness", "nameKey": "item.harness", "icon": "icon_harness", "wearable": true, "defaults": {} },
+  { "type": "helmet", "nameKey": "item.helmet", "icon": "icon_helmet", "wearable": true, "defaults": { "color": "#E6EAF0" } },
+  { "type": "ascender", "nameKey": "item.ascender", "icon": "icon_ascender", "wearable": false, "defaults": {} },
+  { "type": "lanyard", "nameKey": "item.lanyard", "icon": "icon_lanyard_2", "wearable": false, "defaults": { "arms": 2 } },
+  { "type": "gloves", "nameKey": "item.gloves", "icon": "icon_gloves", "wearable": true, "defaults": {} },
+  { "type": "crampons", "nameKey": "item.crampons", "icon": "icon_crampons", "wearable": true, "defaults": {} },
+  { "type": "ice_axe", "nameKey": "item.ice_axe", "icon": "icon_ice_axe", "wearable": false, "defaults": {} },
+  { "type": "backpack", "nameKey": "item.backpack", "icon": "icon_backpack", "wearable": false, "defaults": {} }
+]

@@ -1,0 +1,296 @@
+[
+  {
+    "id": "pryamyi",
+    "nameKey": "knot.pryamyi.name",
+    "descriptionKey": "knot.pryamyi.description",
+    "enRef": "Square (reef) knot",
+    "category": "join_same",
+    "controlKnotsRequired": 2,
+    "constantLoadOnly": true,
+    "requires": [],
+    "icon": "knot_pryamyi"
+  },
+  {
+    "id": "tkatskyi",
+    "nameKey": "knot.tkatskyi.name",
+    "descriptionKey": "knot.tkatskyi.description",
+    "enRef": "Weaver's knot",
+    "category": "join_same",
+    "controlKnotsRequired": 2,
+    "requires": [],
+    "icon": "knot_tkatskyi"
+  },
+  {
+    "id": "grapevine",
+    "nameKey": "knot.grapevine.name",
+    "descriptionKey": "knot.grapevine.description",
+    "enRef": "Double fisherman's",
+    "category": "join_same",
+    "controlKnotsRequired": 0,
+    "requires": [],
+    "icon": "knot_grapevine"
+  },
+  {
+    "id": "zustrichnyi",
+    "nameKey": "knot.zustrichnyi.name",
+    "descriptionKey": "knot.zustrichnyi.description",
+    "enRef": "Water knot",
+    "category": "join_same",
+    "controlKnotsRequired": 0,
+    "requires": [],
+    "icon": "knot_zustrichnyi"
+  },
+  {
+    "id": "zustrichna_visimka",
+    "nameKey": "knot.zustrichna_visimka.name",
+    "descriptionKey": "knot.zustrichna_visimka.description",
+    "enRef": "Figure-8 bend",
+    "category": "join_same",
+    "controlKnotsRequired": 0,
+    "requires": [],
+    "icon": "knot_zustrichna_visimka"
+  },
+  {
+    "id": "akademichnyi",
+    "nameKey": "knot.akademichnyi.name",
+    "descriptionKey": "knot.akademichnyi.description",
+    "enRef": "Surgeon's-type bend",
+    "category": "join_diff",
+    "controlKnotsRequired": 2,
+    "requires": [],
+    "icon": "knot_akademichnyi"
+  },
+  {
+    "id": "bramshkotovyi",
+    "nameKey": "knot.bramshkotovyi.name",
+    "descriptionKey": "knot.bramshkotovyi.description",
+    "enRef": "Double sheet bend",
+    "category": "join_diff",
+    "controlKnotsRequired": 2,
+    "minTurns": 2,
+    "requires": [],
+    "icon": "knot_bramshkotovyi"
+  },
+  {
+    "id": "providnyk_visimka",
+    "nameKey": "knot.providnyk_visimka.name",
+    "descriptionKey": "knot.providnyk_visimka.description",
+    "enRef": "Figure-8 on a bight",
+    "category": "loop",
+    "controlKnotsRequired": 0,
+    "requires": [],
+    "icon": "knot_providnyk_visimka"
+  },
+  {
+    "id": "providnyk_visimka_odnym",
+    "nameKey": "knot.providnyk_visimka_odnym.name",
+    "descriptionKey": "knot.providnyk_visimka_odnym.description",
+    "enRef": "Figure-8 follow-through",
+    "category": "loop",
+    "controlKnotsRequired": 0,
+    "requires": [],
+    "icon": "knot_providnyk_visimka_odnym"
+  },
+  {
+    "id": "serednii_providnyk",
+    "nameKey": "knot.serednii_providnyk.name",
+    "descriptionKey": "knot.serednii_providnyk.description",
+    "enRef": "Alpine butterfly",
+    "category": "loop",
+    "controlKnotsRequired": 0,
+    "requires": [],
+    "icon": "knot_serednii_providnyk"
+  },
+  {
+    "id": "podviinyi_providnyk",
+    "nameKey": "knot.podviinyi_providnyk.name",
+    "descriptionKey": "knot.podviinyi_providnyk.description",
+    "enRef": "Double figure-8 loop",
+    "category": "loop",
+    "controlKnotsRequired": 0,
+    "requires": [],
+    "icon": "knot_podviinyi_providnyk"
+  },
+  {
+    "id": "bulin",
+    "nameKey": "knot.bulin.name",
+    "descriptionKey": "knot.bulin.description",
+    "enRef": "Bowline",
+    "category": "attach_support",
+    "controlKnotsRequired": 1,
+    "requires": [],
+    "icon": "knot_bulin"
+  },
+  {
+    "id": "stremeno",
+    "nameKey": "knot.stremeno.name",
+    "descriptionKey": "knot.stremeno.description",
+    "enRef": "Clove hitch",
+    "category": "attach_support",
+    "controlKnotsRequired": 0,
+    "requires": [],
+    "icon": "knot_stremeno"
+  },
+  {
+    "id": "stremeno_odnym",
+    "nameKey": "knot.stremeno_odnym.name",
+    "descriptionKey": "knot.stremeno_odnym.description",
+    "enRef": "Clove hitch (one end)",
+    "category": "attach_support",
+    "controlKnotsRequired": 1,
+    "requires": [],
+    "icon": "knot_stremeno_odnym"
+  },
+  {
+    "id": "shtyk",
+    "nameKey": "knot.shtyk.name",
+    "descriptionKey": "knot.shtyk.description",
+    "enRef": "Half hitches",
+    "category": "attach_support",
+    "controlKnotsRequired": 1,
+    "minTurns": 3,
+    "controlNotNeededFromTurns": 6,
+    "requires": [],
+    "icon": "knot_shtyk"
+  },
+  {
+    "id": "shtyk_tonka",
+    "nameKey": "knot.shtyk_tonka.name",
+    "descriptionKey": "knot.shtyk_tonka.description",
+    "enRef": "Half hitches, thin support",
+    "category": "attach_support",
+    "controlKnotsRequired": 1,
+    "minTurns": 3,
+    "controlNotNeededFromTurns": 4,
+    "untieExtraThin": true,
+    "requires": [],
+    "icon": "knot_shtyk_tonka"
+  },
+  {
+    "id": "shtyk_tovsta",
+    "nameKey": "knot.shtyk_tovsta.name",
+    "descriptionKey": "knot.shtyk_tovsta.description",
+    "enRef": "Half hitches, thick support",
+    "category": "attach_support",
+    "controlKnotsRequired": 1,
+    "minTurns": 3,
+    "controlNotNeededFromTurns": 4,
+    "requires": [],
+    "icon": "knot_shtyk_tovsta"
+  },
+  {
+    "id": "karabinna_udavka",
+    "nameKey": "knot.karabinna_udavka.name",
+    "descriptionKey": "knot.karabinna_udavka.description",
+    "enRef": "Releasable carabiner hitch",
+    "category": "attach_support",
+    "controlKnotsRequired": 0,
+    "minSupport": "thick",
+    "releasable": true,
+    "requires": [
+      "locking_carabiner"
+    ],
+    "icon": "knot_karabinna_udavka"
+  },
+  {
+    "id": "prusik",
+    "nameKey": "knot.prusik.name",
+    "descriptionKey": "knot.prusik.description",
+    "enRef": "Prusik",
+    "category": "grabbing",
+    "controlKnotsRequired": 0,
+    "minTurns": 2,
+    "endsMustBeJoined": true,
+    "diameterRatio": {
+      "min": 0.4,
+      "max": 0.7,
+      "ideal": 0.5
+    },
+    "requires": [
+      "locking_carabiner"
+    ],
+    "icon": "knot_prusik"
+  },
+  {
+    "id": "prusik_odnym",
+    "nameKey": "knot.prusik_odnym.name",
+    "descriptionKey": "knot.prusik_odnym.description",
+    "enRef": "Prusik (one end)",
+    "category": "grabbing",
+    "controlKnotsRequired": 1,
+    "minTurns": 2,
+    "diameterRatio": {
+      "min": 0.4,
+      "max": 0.7,
+      "ideal": 0.5
+    },
+    "requires": [
+      "locking_carabiner"
+    ],
+    "icon": "knot_prusik_odnym"
+  },
+  {
+    "id": "avstriiskyi_skhopl",
+    "nameKey": "knot.avstriiskyi_skhopl.name",
+    "descriptionKey": "knot.avstriiskyi_skhopl.description",
+    "enRef": "Austrian grabbing hitch",
+    "category": "grabbing",
+    "controlKnotsRequired": 0,
+    "minTurns": 3,
+    "endsMustBeJoined": true,
+    "diameterRatio": {
+      "min": 0.4,
+      "max": 0.7,
+      "ideal": 0.5
+    },
+    "requires": [
+      "locking_carabiner"
+    ],
+    "icon": "knot_avstriiskyi_skhopl"
+  },
+  {
+    "id": "bakhmana",
+    "nameKey": "knot.bakhmana.name",
+    "descriptionKey": "knot.bakhmana.description",
+    "enRef": "Bachmann hitch",
+    "category": "grabbing",
+    "controlKnotsRequired": 0,
+    "minTurns": 3,
+    "endsMustBeJoined": true,
+    "diameterRatio": {
+      "min": 0.4,
+      "max": 0.7,
+      "ideal": 0.5
+    },
+    "requires": [
+      "locking_carabiner"
+    ],
+    "icon": "knot_bakhmana"
+  },
+  {
+    "id": "uiaa",
+    "nameKey": "knot.uiaa.name",
+    "descriptionKey": "knot.uiaa.description",
+    "enRef": "Munter (Italian) hitch",
+    "category": "braking",
+    "controlKnotsRequired": 0,
+    "requires": [
+      "locking_carabiner"
+    ],
+    "feedsInLowerBelay": true,
+    "icon": "knot_uiaa"
+  },
+  {
+    "id": "garda",
+    "nameKey": "knot.garda.name",
+    "descriptionKey": "knot.garda.description",
+    "enRef": "Garda hitch",
+    "category": "braking",
+    "controlKnotsRequired": 0,
+    "requires": [
+      "two_carabiners"
+    ],
+    "feedsInLowerBelay": false,
+    "icon": "knot_garda"
+  }
+]

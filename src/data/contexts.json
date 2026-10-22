@@ -1,0 +1,134 @@
+{
+  "TIE_IN_END": {
+    "nameKey": "context.tie_in_end",
+    "ratings": {
+      "providnyk_visimka_odnym": "correct",
+      "bulin": "acceptable",
+      "providnyk_visimka": {
+        "rating": "acceptable",
+        "requires": "locking_carabiner",
+        "otherwise": "wrong"
+      },
+      "pryamyi": "dangerous",
+      "stremeno": "dangerous",
+      "stremeno_odnym": "dangerous"
+    },
+    "default": "wrong"
+  },
+  "TIE_IN_MIDDLE": {
+    "nameKey": "context.tie_in_middle",
+    "ratings": {
+      "serednii_providnyk": "correct",
+      "providnyk_visimka": {
+        "rating": "acceptable",
+        "requires": "locking_carabiner",
+        "otherwise": "wrong"
+      },
+      "podviinyi_providnyk": {
+        "rating": "acceptable",
+        "requires": "locking_carabiner",
+        "otherwise": "wrong"
+      },
+      "stremeno": "dangerous",
+      "stremeno_odnym": "dangerous"
+    },
+    "default": "wrong"
+  },
+  "ANCHOR_THICK": {
+    "nameKey": "context.anchor_thick",
+    "ratings": {
+      "shtyk_tovsta": "correct",
+      "bulin": "correct",
+      "karabinna_udavka": "correct",
+      "shtyk": "acceptable",
+      "shtyk_tonka": "wrong",
+      "zustrichna_visimka": "correct"
+    },
+    "default": "wrong"
+  },
+  "ANCHOR_THIN": {
+    "nameKey": "context.anchor_thin",
+    "ratings": {
+      "shtyk_tonka": "correct",
+      "bulin": "acceptable",
+      "shtyk_tovsta": "wrong",
+      "karabinna_udavka": "dangerous"
+    },
+    "default": "wrong"
+  },
+  "ANCHOR_ROCK": {
+    "nameKey": "context.anchor_rock",
+    "ratings": {
+      "shtyk_tovsta": "acceptable",
+      "bulin": "acceptable",
+      "karabinna_udavka": "acceptable",
+      "shtyk": "wrong",
+      "shtyk_tonka": "dangerous",
+      "zustrichna_visimka": "acceptable"
+    },
+    "default": "dangerous"
+  },
+  "ANCHOR_CARABINER": {
+    "nameKey": "context.anchor_carabiner",
+    "ratings": {
+      "providnyk_visimka": "correct",
+      "stremeno": "correct",
+      "bulin": "acceptable"
+    },
+    "default": "wrong"
+  },
+  "SELF_BELAY_GRAB": {
+    "nameKey": "context.self_belay_grab",
+    "ratings": {
+      "prusik": "correct",
+      "avstriiskyi_skhopl": "correct",
+      "bakhmana": "correct",
+      "prusik_odnym": "correct"
+    },
+    "default": "wrong"
+  },
+  "BELAY_LOWER": {
+    "nameKey": "context.belay_lower",
+    "ratings": {
+      "uiaa": "correct"
+    },
+    "default": "wrong",
+    "deviceRating": "correct"
+  },
+  "BELAY_UPPER": {
+    "nameKey": "context.belay_upper",
+    "ratings": {
+      "uiaa": "correct",
+      "garda": "correct"
+    },
+    "default": "wrong",
+    "deviceRating": "correct"
+  },
+  "JOIN_SAME": {
+    "nameKey": "context.join_same",
+    "ratings": {
+      "grapevine": "correct",
+      "zustrichna_visimka": "correct",
+      "tkatskyi": "correct",
+      "pryamyi": "acceptable",
+      "zustrichnyi": "acceptable"
+    },
+    "default": "wrong"
+  },
+  "JOIN_DIFF": {
+    "nameKey": "context.join_diff",
+    "ratings": {
+      "akademichnyi": "correct",
+      "bramshkotovyi": "correct"
+    },
+    "default": "wrong"
+  },
+  "LOOP_CORD": {
+    "nameKey": "context.loop_cord",
+    "ratings": {
+      "grapevine": "correct",
+      "zustrichna_visimka": "acceptable"
+    },
+    "default": "wrong"
+  }
+}

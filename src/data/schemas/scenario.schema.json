@@ -1,0 +1,151 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://zakripy-gotovo-rukh/scenario.schema.json",
+  "title": "Scenario",
+  "type": "object",
+  "required": ["schemaVersion", "id", "name", "route", "season", "mode", "seed", "team", "items", "maxSteps"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string" },
+    "route": {
+      "type": "object",
+      "required": ["obstacles"],
+      "additionalProperties": false,
+      "properties": {
+        "obstacles": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/hill" } }
+      }
+    },
+    "season": { "enum": ["spring", "summer", "autumn", "winter"] },
+    "mode": { "enum": ["learning", "exam"] },
+    "seed": { "type": "integer", "minimum": 0 },
+    "team": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/member" } },
+    "items": { "type": "array", "items": { "$ref": "#/definitions/item" } },
+    "maxSteps": { "anyOf": [{ "type": "null" }, { "type": "integer", "minimum": 1 }] },
+    "weights": { "description": "Weight settings snapshot; ignored on import (weights come from Settings, CR-7).", "type": "object" }
+  },
+  "definitions": {
+    "surface": { "enum": ["grass", "ground", "rock", "scree"] },
+    "section": {
+      "type": "object",
+      "required": ["lengthM", "angleDeg", "surface"],
+      "additionalProperties": false,
+      "properties": {
+        "lengthM": { "type": "number", "minimum": 0 },
+        "angleDeg": { "type": "number", "minimum": 0, "maximum": 90 },
+        "surface": { "$ref": "#/definitions/surface" }
+      }
+    },
+    "tree": {
+      "type": "object",
+      "required": ["id", "s", "size"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "s": { "type": "number" },
+        "size": { "enum": ["small", "large"] },
+        "kind": { "enum": ["conifer", "deciduous"] }
+      }
+    },
+    "basePoint": {
+      "type": "object",
+      "required": ["id", "s", "anchorType"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "s": { "type": "number" },
+        "anchorType": { "enum": ["tree", "rock_outcrop", "bolt"] },
+        "treeId": { "type": "string" }
+      }
+    },
+    "hill": {
+      "type": "object",
+      "required": ["id", "type", "routeType", "startZoneM", "finishZoneM", "sections", "trees", "basePoints"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "nameKey": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "const": "hill" },
+        "routeType": { "enum": ["ascent", "descent", "ascent_descent"] },
+        "startZoneM": { "type": "number", "minimum": 0 },
+        "finishZoneM": { "type": "number", "minimum": 0 },
+        "summitZoneM": { "type": "number", "minimum": 0 },
+        "sections": { "type": "array", "items": { "$ref": "#/definitions/section" } },
+        "descentSections": { "type": "array", "items": { "$ref": "#/definitions/section" } },
+        "trees": { "type": "array", "items": { "$ref": "#/definitions/tree" } },
+        "basePoints": { "type": "array", "items": { "$ref": "#/definitions/basePoint" } }
+      }
+    },
+    "member": {
+      "type": "object",
+      "required": ["id", "name", "appearance"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string" },
+        "role": { "description": "Legacy (removed in CR-3); accepted and dropped on import.", "enum": ["leader", "member", "last"] },
+        "appearance": {
+          "type": "object",
+          "required": ["row"],
+          "additionalProperties": false,
+          "properties": {
+            "row": { "type": "integer", "minimum": 0, "maximum": 6 },
+            "jacketColor": { "type": "string" }
+          }
+        },
+        "baseWeightKg": { "description": "Legacy (removed in CR-7); accepted and dropped on import.", "type": "number", "minimum": 0 }
+      }
+    },
+    "item": {
+      "type": "object",
+      "required": ["id", "type", "props", "assignedTo"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "enum": ["rope", "cord", "sling", "carabiner", "belay_device", "ascender", "harness", "helmet", "lanyard", "gloves", "crampons", "ice_axe", "backpack"] },
+        "weightKg": { "description": "Legacy (removed in CR-7); accepted and dropped on import.", "type": "number", "minimum": 0 },
+        "props": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "lengthM": { "type": "number", "minimum": 0 },
+            "diameterMm": { "type": "number", "minimum": 0 },
+            "kind": { "enum": ["static", "dynamic"] },
+            "color": { "type": "string" },
+            "lengthCm": { "type": "number", "minimum": 0 },
+            "locking": { "type": "boolean" },
+            "shape": { "enum": ["hms", "d", "oval"] },
+            "model": { "enum": ["atc", "figure8"] },
+            "arms": { "type": "integer", "minimum": 1, "maximum": 2 },
+            "baseWeightKg": { "description": "Legacy (removed in CR-7); dropped on import.", "type": "number", "minimum": 0 },
+            "loopKnot": {
+              "type": "object",
+              "required": ["knotId", "control"],
+              "additionalProperties": false,
+              "properties": {
+                "knotId": { "type": "string" },
+                "control": { "enum": ["none", "single", "double"] }
+              }
+            }
+          }
+        },
+        "assignedTo": {
+          "anyOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["memberId", "as"],
+              "additionalProperties": false,
+              "properties": {
+                "memberId": { "type": "string" },
+                "as": { "enum": ["worn", "carried"] }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

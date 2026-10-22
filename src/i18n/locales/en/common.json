@@ -1,0 +1,18 @@
+{
+  "ui.title": "Закріпи! Готово! Рух!",
+  "ui.back": "Back",
+  "ui.next": "Next",
+  "ui.close": "Close",
+  "ui.cancel": "Cancel",
+  "ui.confirm": "Confirm",
+  "ui.language": "Language",
+  "ui.main_menu": "Main menu",
+  "ui.everyone": "everyone",
+  "ui.kg": "{kg} kg",
+  "ui.weight_tooltip": "Base weight {base} kg + gear {gear} kg (max {max} kg)",
+  "ui.m": "{m} m",
+  "ui.yes": "Yes",
+  "ui.no": "No",
+  "target.segment": "the fixed rope",
+  "target.base": "the base"
+}

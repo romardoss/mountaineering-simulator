@@ -1,0 +1,93 @@
+{
+  "id": "spusk-zi-schylu",
+  "nameKey": "preset.hill.descent",
+  "type": "hill",
+  "routeType": "descent",
+  "startZoneM": 6,
+  "finishZoneM": 8,
+  "sections": [
+    {
+      "lengthM": 15,
+      "angleDeg": 45,
+      "surface": "rock"
+    },
+    {
+      "lengthM": 20,
+      "angleDeg": 38,
+      "surface": "ground"
+    },
+    {
+      "lengthM": 20,
+      "angleDeg": 28,
+      "surface": "grass"
+    },
+    {
+      "lengthM": 15,
+      "angleDeg": 15,
+      "surface": "grass"
+    }
+  ],
+  "trees": [
+    {
+      "id": "t1",
+      "s": 3,
+      "size": "large",
+      "kind": "conifer"
+    },
+    {
+      "id": "t2",
+      "s": 32,
+      "size": "small",
+      "kind": "conifer"
+    },
+    {
+      "id": "t3",
+      "s": 41,
+      "size": "large",
+      "kind": "conifer"
+    },
+    {
+      "id": "t4",
+      "s": 61,
+      "size": "large",
+      "kind": "deciduous"
+    },
+    {
+      "id": "t5",
+      "s": 81,
+      "size": "large",
+      "kind": "conifer"
+    }
+  ],
+  "basePoints": [
+    {
+      "id": "bp_start",
+      "s": 3,
+      "anchorType": "tree",
+      "treeId": "t1"
+    },
+    {
+      "id": "bp_mid2",
+      "s": 21,
+      "anchorType": "rock_outcrop"
+    },
+    {
+      "id": "bp_mid1",
+      "s": 41,
+      "anchorType": "tree",
+      "treeId": "t3"
+    },
+    {
+      "id": "bp_low",
+      "s": 61,
+      "anchorType": "tree",
+      "treeId": "t4"
+    },
+    {
+      "id": "bp_finish",
+      "s": 81,
+      "anchorType": "tree",
+      "treeId": "t5"
+    }
+  ]
+}

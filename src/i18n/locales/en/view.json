@@ -1,0 +1,14 @@
+{
+  "ui.view.zoom1": "1×",
+  "ui.view.zoom2": "2×",
+  "ui.view.follow": "Follow",
+  "ui.view.skip": "Skip animation",
+  "ui.view.skip_hint": "Space or click the scene",
+  "ui.view.canvas_hint": "Drag to move the camera. Click a member to select. Right-click on the hill to send the selected member there. Click a base spot next to the member to show the station icon; click it to build a base. Keys: arrows, +/−, F follow, Space skip animation.",
+  "ui.view.canvas_label": "Hill scene",
+  "ui.view.start": "START",
+  "ui.view.finish": "FINISH",
+  "ui.view.summit": "SUMMIT",
+  "ui.view.station.base": "Build a base",
+  "ui.view.station.intermediate": "Set up an intermediate protection point"
+}

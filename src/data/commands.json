@@ -1,0 +1,13 @@
+[
+  { "key": "belay_ready", "textKey": "cmd.belay_ready", "hintKey": "cmd.belay_ready.hint", "wrongKeys": ["cmd.wrong.belay_ready.1", "cmd.wrong.belay_ready.2"] },
+  { "key": "go", "textKey": "cmd.go", "hintKey": "cmd.go.hint", "wrongKeys": ["cmd.wrong.go.1", "cmd.wrong.go.2"] },
+  { "key": "stop", "textKey": "cmd.stop", "hintKey": "cmd.stop.hint", "wrongKeys": ["cmd.wrong.stop.1", "cmd.wrong.stop.2"] },
+  { "key": "take_in", "textKey": "cmd.take_in", "hintKey": "cmd.take_in.hint", "wrongKeys": ["cmd.wrong.take_in.1", "cmd.wrong.take_in.2"] },
+  { "key": "give_slack", "textKey": "cmd.give_slack", "hintKey": "cmd.give_slack.hint", "wrongKeys": ["cmd.wrong.give_slack.1", "cmd.wrong.give_slack.2"] },
+  { "key": "secured", "textKey": "cmd.secured", "hintKey": "cmd.secured.hint", "wrongKeys": ["cmd.wrong.secured.1", "cmd.wrong.secured.2"] },
+  { "key": "fixed_rope_ready", "textKey": "cmd.fixed_rope_ready", "hintKey": "cmd.fixed_rope_ready.hint", "wrongKeys": ["cmd.wrong.fixed_rope_ready.1", "cmd.wrong.fixed_rope_ready.2"] },
+  { "key": "fixed_rope_free", "textKey": "cmd.fixed_rope_free", "hintKey": "cmd.fixed_rope_free.hint", "wrongKeys": ["cmd.wrong.fixed_rope_free.1", "cmd.wrong.fixed_rope_free.2"] },
+  { "key": "rock", "textKey": "cmd.rock", "hintKey": "cmd.rock.hint", "wrongKeys": ["cmd.wrong.rock.1", "cmd.wrong.rock.2"] },
+  { "key": "hold", "textKey": "cmd.hold", "hintKey": "cmd.hold.hint", "wrongKeys": ["cmd.wrong.hold.1", "cmd.wrong.hold.2"] },
+  { "key": "understood", "textKey": "cmd.understood", "hintKey": "cmd.understood.hint", "wrongKeys": ["cmd.wrong.understood.1", "cmd.wrong.understood.2"] }
+]

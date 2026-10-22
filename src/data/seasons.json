@@ -1,0 +1,13 @@
+{
+  "seasons": {
+    "spring": { "pRain": 0.35, "pMud": 0.6 },
+    "summer": { "pRain": 0.15, "pMud": 0.2 },
+    "autumn": { "pRain": 0.45, "pMud": 0.6 },
+    "winter": { "pRain": 0, "pMud": 0 }
+  },
+  "surfaceMap": {
+    "winter": { "grass": "snow", "ground": "snow", "rock": "icy_rock", "scree": "snow_scree" },
+    "rain": { "grass": "mud", "ground": "mud", "rock": "wet_rock" },
+    "mud": { "ground": "mud" }
+  }
+}

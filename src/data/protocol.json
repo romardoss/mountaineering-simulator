@@ -1,0 +1,9 @@
+[
+  { "id": "P1", "enabled": true, "severity": "warning", "messageKey": "rule.P1", "physical": true },
+  { "id": "P2", "enabled": true, "severity": "warning", "messageKey": "rule.P2", "physical": true },
+  { "id": "P3", "enabled": true, "severity": "warning", "messageKey": "rule.P3", "physical": false },
+  { "id": "P4", "enabled": true, "severity": "warning", "messageKey": "rule.P4", "physical": true },
+  { "id": "P5", "enabled": true, "severity": "warning", "messageKey": "rule.P5", "physical": true },
+  { "id": "P6", "enabled": true, "severity": "warning", "messageKey": "rule.P6", "physical": false },
+  { "id": "P7", "enabled": true, "severity": "hint", "messageKey": "rule.P7", "physical": false }
+]

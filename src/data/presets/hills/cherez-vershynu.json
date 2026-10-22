@@ -1,0 +1,129 @@
+{
+  "id": "cherez-vershynu",
+  "nameKey": "preset.hill.over_summit",
+  "type": "hill",
+  "routeType": "ascent_descent",
+  "startZoneM": 6,
+  "finishZoneM": 8,
+  "summitZoneM": 6,
+  "sections": [
+    {
+      "lengthM": 15,
+      "angleDeg": 15,
+      "surface": "grass"
+    },
+    {
+      "lengthM": 20,
+      "angleDeg": 28,
+      "surface": "grass"
+    },
+    {
+      "lengthM": 20,
+      "angleDeg": 38,
+      "surface": "ground"
+    },
+    {
+      "lengthM": 15,
+      "angleDeg": 45,
+      "surface": "rock"
+    }
+  ],
+  "descentSections": [
+    {
+      "lengthM": 20,
+      "angleDeg": 35,
+      "surface": "grass"
+    },
+    {
+      "lengthM": 20,
+      "angleDeg": 25,
+      "surface": "grass"
+    },
+    {
+      "lengthM": 15,
+      "angleDeg": 15,
+      "surface": "grass"
+    }
+  ],
+  "trees": [
+    {
+      "id": "t1",
+      "s": 3,
+      "size": "large",
+      "kind": "conifer"
+    },
+    {
+      "id": "t2",
+      "s": 21,
+      "size": "large",
+      "kind": "deciduous"
+    },
+    {
+      "id": "t3",
+      "s": 41,
+      "size": "large",
+      "kind": "conifer"
+    },
+    {
+      "id": "t5",
+      "s": 79,
+      "size": "large",
+      "kind": "conifer"
+    },
+    {
+      "id": "t6",
+      "s": 102,
+      "size": "large",
+      "kind": "deciduous"
+    },
+    {
+      "id": "t7",
+      "s": 122,
+      "size": "small",
+      "kind": "conifer"
+    },
+    {
+      "id": "t8",
+      "s": 141,
+      "size": "large",
+      "kind": "conifer"
+    }
+  ],
+  "basePoints": [
+    {
+      "id": "bp_start",
+      "s": 3,
+      "anchorType": "tree",
+      "treeId": "t1"
+    },
+    {
+      "id": "bp_mid1",
+      "s": 41,
+      "anchorType": "tree",
+      "treeId": "t3"
+    },
+    {
+      "id": "bp_mid2",
+      "s": 61,
+      "anchorType": "rock_outcrop"
+    },
+    {
+      "id": "bp_summit",
+      "s": 79,
+      "anchorType": "tree",
+      "treeId": "t5"
+    },
+    {
+      "id": "bp_d1",
+      "s": 102,
+      "anchorType": "tree",
+      "treeId": "t6"
+    },
+    {
+      "id": "bp_finish",
+      "s": 141,
+      "anchorType": "tree",
+      "treeId": "t8"
+    }
+  ]
+}

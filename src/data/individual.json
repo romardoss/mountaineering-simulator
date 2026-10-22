@@ -1,0 +1,15 @@
+{
+  "always": [
+    { "type": "helmet", "as": "worn" },
+    { "type": "harness", "as": "worn" },
+    { "type": "gloves", "as": "worn" },
+    { "type": "belay_device", "as": "carried", "props": { "model": "atc" } },
+    { "type": "ascender", "as": "carried" },
+    { "type": "lanyard", "as": "carried", "props": { "arms": 2 } },
+    { "type": "cord", "as": "carried", "count": 2, "props": { "lengthM": 1.5, "diameterMm": 6, "loopKnot": { "knotId": "grapevine", "control": "none" } } }
+  ],
+  "winter": [
+    { "type": "crampons", "as": "worn" },
+    { "type": "ice_axe", "as": "carried" }
+  ]
+}

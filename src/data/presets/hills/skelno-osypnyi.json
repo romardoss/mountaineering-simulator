@@ -1,0 +1,72 @@
+{
+  "id": "skelno-osypnyi",
+  "nameKey": "preset.hill.rocky",
+  "type": "hill",
+  "routeType": "ascent",
+  "startZoneM": 6,
+  "finishZoneM": 8,
+  "sections": [
+    {
+      "lengthM": 15,
+      "angleDeg": 25,
+      "surface": "scree"
+    },
+    {
+      "lengthM": 20,
+      "angleDeg": 35,
+      "surface": "scree"
+    },
+    {
+      "lengthM": 20,
+      "angleDeg": 45,
+      "surface": "rock"
+    },
+    {
+      "lengthM": 15,
+      "angleDeg": 50,
+      "surface": "rock"
+    }
+  ],
+  "trees": [
+    {
+      "id": "t1",
+      "s": 3,
+      "size": "large",
+      "kind": "conifer"
+    },
+    {
+      "id": "t2",
+      "s": 82,
+      "size": "small",
+      "kind": "conifer"
+    }
+  ],
+  "basePoints": [
+    {
+      "id": "bp_start",
+      "s": 3,
+      "anchorType": "tree",
+      "treeId": "t1"
+    },
+    {
+      "id": "bp_1",
+      "s": 21,
+      "anchorType": "rock_outcrop"
+    },
+    {
+      "id": "bp_2",
+      "s": 41,
+      "anchorType": "bolt"
+    },
+    {
+      "id": "bp_3",
+      "s": 61,
+      "anchorType": "bolt"
+    },
+    {
+      "id": "bp_top",
+      "s": 79,
+      "anchorType": "rock_outcrop"
+    }
+  ]
+}

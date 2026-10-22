@@ -1,0 +1,18 @@
+{
+  "ui.title": "Закріпи! Готово! Рух!",
+  "ui.back": "Назад",
+  "ui.next": "Далі",
+  "ui.close": "Закрити",
+  "ui.cancel": "Скасувати",
+  "ui.confirm": "Підтвердити",
+  "ui.language": "Мова",
+  "ui.main_menu": "Головне меню",
+  "ui.everyone": "всім",
+  "ui.kg": "{kg} кг",
+  "ui.weight_tooltip": "Базова вага {base} кг + спорядження {gear} кг (максимум {max} кг)",
+  "ui.m": "{m} м",
+  "ui.yes": "Так",
+  "ui.no": "Ні",
+  "target.segment": "перила",
+  "target.base": "базу"
+}

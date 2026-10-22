@@ -1,0 +1,219 @@
+{
+  "id": "osinnii-lyst-2026-2-2",
+  "nameKey": "preset.hill.osinnii_lyst_2026_2_2",
+  "type": "hill",
+  "routeType": "ascent",
+  "startZoneM": 4,
+  "finishZoneM": 4,
+  "sections": [
+    {
+      "lengthM": 6,
+      "angleDeg": 20,
+      "surface": "grass"
+    },
+    {
+      "lengthM": 7,
+      "angleDeg": 35,
+      "surface": "ground"
+    },
+    {
+      "lengthM": 6,
+      "angleDeg": 50,
+      "surface": "ground"
+    },
+    {
+      "lengthM": 7,
+      "angleDeg": 42,
+      "surface": "ground"
+    },
+    {
+      "lengthM": 5,
+      "angleDeg": 28,
+      "surface": "grass"
+    }
+  ],
+  "trees": [
+    {
+      "id": "t_d1",
+      "s": 0.6,
+      "size": "small",
+      "kind": "conifer"
+    },
+    {
+      "id": "t_start",
+      "s": 2,
+      "size": "small",
+      "kind": "deciduous"
+    },
+    {
+      "id": "t_d2",
+      "s": 3.4,
+      "size": "small",
+      "kind": "conifer"
+    },
+    {
+      "id": "t_d3",
+      "s": 5.6,
+      "size": "small",
+      "kind": "deciduous"
+    },
+    {
+      "id": "t_d4",
+      "s": 7.3,
+      "size": "small",
+      "kind": "conifer"
+    },
+    {
+      "id": "t_pps1",
+      "s": 9,
+      "size": "small",
+      "kind": "deciduous"
+    },
+    {
+      "id": "t_d5",
+      "s": 11.4,
+      "size": "small",
+      "kind": "deciduous"
+    },
+    {
+      "id": "t_d6",
+      "s": 12.6,
+      "size": "small",
+      "kind": "conifer"
+    },
+    {
+      "id": "t_pps2",
+      "s": 14,
+      "size": "small",
+      "kind": "conifer"
+    },
+    {
+      "id": "t_d7",
+      "s": 16.3,
+      "size": "small",
+      "kind": "deciduous"
+    },
+    {
+      "id": "t_d8",
+      "s": 17.6,
+      "size": "small",
+      "kind": "conifer"
+    },
+    {
+      "id": "t_pps3",
+      "s": 19.5,
+      "size": "small",
+      "kind": "deciduous"
+    },
+    {
+      "id": "t_d9",
+      "s": 21.8,
+      "size": "small",
+      "kind": "conifer"
+    },
+    {
+      "id": "t_d10",
+      "s": 23.2,
+      "size": "small",
+      "kind": "deciduous"
+    },
+    {
+      "id": "t_pps4",
+      "s": 25,
+      "size": "small",
+      "kind": "conifer"
+    },
+    {
+      "id": "t_d11",
+      "s": 27.2,
+      "size": "small",
+      "kind": "deciduous"
+    },
+    {
+      "id": "t_d12",
+      "s": 28.8,
+      "size": "small",
+      "kind": "conifer"
+    },
+    {
+      "id": "t_pps5",
+      "s": 31,
+      "size": "small",
+      "kind": "deciduous"
+    },
+    {
+      "id": "t_d13",
+      "s": 33.1,
+      "size": "small",
+      "kind": "conifer"
+    },
+    {
+      "id": "t_d14",
+      "s": 34.4,
+      "size": "small",
+      "kind": "deciduous"
+    },
+    {
+      "id": "t_d15",
+      "s": 35.6,
+      "size": "small",
+      "kind": "conifer"
+    },
+    {
+      "id": "t_finish",
+      "s": 37,
+      "size": "large",
+      "kind": "deciduous"
+    },
+    {
+      "id": "t_d16",
+      "s": 38.6,
+      "size": "small",
+      "kind": "conifer"
+    }
+  ],
+  "basePoints": [
+    {
+      "id": "bp_start",
+      "s": 2,
+      "anchorType": "tree",
+      "treeId": "t_start"
+    },
+    {
+      "id": "bp_pps1",
+      "s": 9,
+      "anchorType": "tree",
+      "treeId": "t_pps1"
+    },
+    {
+      "id": "bp_pps2",
+      "s": 14,
+      "anchorType": "tree",
+      "treeId": "t_pps2"
+    },
+    {
+      "id": "bp_pps3",
+      "s": 19.5,
+      "anchorType": "tree",
+      "treeId": "t_pps3"
+    },
+    {
+      "id": "bp_pps4",
+      "s": 25,
+      "anchorType": "tree",
+      "treeId": "t_pps4"
+    },
+    {
+      "id": "bp_pps5",
+      "s": 31,
+      "anchorType": "tree",
+      "treeId": "t_pps5"
+    },
+    {
+      "id": "bp_finish",
+      "s": 37,
+      "anchorType": "tree",
+      "treeId": "t_finish"
+    }
+  ]
+}
