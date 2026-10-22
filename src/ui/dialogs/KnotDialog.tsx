@@ -92,7 +92,14 @@ export function KnotDialog(props: KnotDialogProps) {
           )}
         </div>
       )}
-      <div class="row" style={{ marginTop: 10, justifyContent: "flex-end" }}>
+      {/* fixed footer: always visible while the knot list scrolls (CR-45) */}
+      <div class="modal-footer">
+        {evaluation && (
+          <span>
+            {knotName(choice!.knotId)}: <span class={`badge ${evaluation.rating}`}>{t(`rating.${evaluation.rating}`)}</span>
+          </span>
+        )}
+        <span class="spacer" />
         <button class="btn secondary" onClick={props.onCancel}>
           {t("ui.cancel")}
         </button>

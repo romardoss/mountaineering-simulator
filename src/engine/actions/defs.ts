@@ -675,6 +675,16 @@ export function belayEvalInput(ctx: ReadCtx, m: MemberId, p: ParamsOf<"belay">) 
   };
 }
 
+/** Base for «від бази» (CR-47): the one the belayer is clipped to, else the nearest adjacent built base. */
+function belayBase(ctx: ReadCtx, m: MemberId): BaseState | undefined {
+  const att = attachmentsOf(ctx.state, m).find((a) => a.target.kind === "base");
+  if (att && att.target.kind === "base") return ctx.state.bases[att.target.baseId];
+  const here = posOf(ctx, m);
+  return Object.values(ctx.state.bases)
+    .filter((b) => adj(ctx, b.pos, here))
+    .sort((a, b) => Math.abs(a.pos.s - here.s) - Math.abs(b.pos.s - here.s))[0];
+}
+
 const belay: ActionDef<ParamsOf<"belay">> = {
   kind: "belay",
   phase: "belay",
@@ -684,9 +694,8 @@ const belay: ActionDef<ParamsOf<"belay">> = {
     if (harnessNodes(ctx.state, p.climberId).length === 0) return fail("reason.climber_not_tied_in");
     if (!belayRopeFor(ctx, m, p.climberId)) return fail("reason.no_rope_end_near");
     if (belaysAsClimber(ctx.state, p.climberId).some((b) => b.belayerId === m)) return fail("reason.already_belaying");
-    // CR-26: the belayer first self-secures at a base
-    if (!attachmentsOf(ctx.state, m).some((a) => a.target.kind === "base" && a.method !== "hand")) return fail("reason.belayer_not_secured");
-    if (p.anchor === "base" && !attachmentsOf(ctx.state, m).some((a) => a.target.kind === "base")) return fail("reason.not_secured_to_base");
+    // «від бази»: a built base next to the belayer (own self-belay not required, CR-47)
+    if (p.anchor === "base" && !belayBase(ctx, m)) return fail("reason.no_base_near");
     const it = brakingItems(ctx, m, p);
     if (it.reason) return fail(it.reason);
     if (p.braking === "knot") return knotValid(ctx, p.knot);
@@ -698,6 +707,7 @@ const belay: ActionDef<ParamsOf<"belay">> = {
     if (p.braking === "knot") hints.push(...knotHints(ctx, p.knot, ctxId, belayEvalInput(ctx, m, p)));
     if (p.braking === "knot" && p.knot?.knotId === "garda" && ctxId === "BELAY_LOWER") hints.push({ key: "knot.garda_blocks_feed" });
     if (p.anchor === "body" && angleAt(geoOf(ctx.state), posOf(ctx, m).s) >= ctx.data.hazards.injury.belayerPulledMinDeg) hints.push({ key: "hint.body_belay_steep" });
+    if (!attachmentsOf(ctx.state, m).some((a) => a.target.kind === "base" && a.method !== "hand")) hints.push({ key: "hint.belayer_unsecured" });
     hints.push({ key: "hint.belay_next_step" });
     return hints;
   },
@@ -713,7 +723,7 @@ const belay: ActionDef<ParamsOf<"belay">> = {
       const k = createKnot(tx, { knotId: p.knot!.knotId, context: mode === "lower" ? "BELAY_LOWER" : "BELAY_UPPER", control: p.knot!.control, turns: p.knot!.turns, memberId: m, itemId: found.rope.ropeId, input: belayEvalInput(tx, m, p) });
       braking = { kind: "knot", knotId: k.id, carabinerIds: items.map((i) => i.id) };
     }
-    const anchorAtt = attachmentsOf(st, m).find((a) => a.target.kind === "base");
+    const anchorBase = belayBase(tx, m);
     const rel: BelayRelation = {
       id,
       belayerId: m,
@@ -721,7 +731,7 @@ const belay: ActionDef<ParamsOf<"belay">> = {
       ropeId: found.rope.ropeId,
       mode,
       braking,
-      anchor: p.anchor === "base" && anchorAtt && anchorAtt.target.kind === "base" ? { kind: "base", baseId: anchorAtt.target.baseId } : { kind: "body" },
+      anchor: p.anchor === "base" && anchorBase ? { kind: "base", baseId: anchorBase.id } : { kind: "body" },
       step: st.step,
       distanceAtSetM: Math.abs(posOf(tx, m).s - posOf(tx, p.climberId).s),
       inactiveThisStep: false,

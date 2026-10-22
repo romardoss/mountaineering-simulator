@@ -335,13 +335,27 @@ describe("CR-21 / CR-24", () => {
 });
 
 describe("CR-26 belay sequence", () => {
-  it("the belayer must be self-secured at a base before setting up the belay", () => {
+  it("an unsecured belayer may belay «від себе» or «від бази» next to a base, with a learning hint (CR-47)", () => {
     const g = new Game(scenario({ hill: steepHill(38, "ground") }));
     const rope = g.item("rope", "m2").id;
     g.step({ m1: { kind: "make_base", basePointId: "bp_start", construction: "sling" }, m2: { kind: "pass", toMemberId: "m1", itemIds: [rope] } });
     g.step({ m1: { kind: "tie_in", ropeId: rope, knot: K("providnyk_visimka_odnym"), viaCarabiner: false } });
-    const v = engine.validatePlan(g.state, [{ memberId: "m2", params: { kind: "belay", climberId: "m1", braking: "knot", knot: K("uiaa"), anchor: "body" } }]);
-    expect(v.members.m2.reasonKey).toBe("reason.belayer_not_secured");
+    for (const anchor of ["body", "base"] as const) {
+      const v = engine.validatePlan(g.state, [{ memberId: "m2", params: { kind: "belay", climberId: "m1", braking: "knot", knot: K("uiaa"), anchor } }]).members.m2;
+      expect(v.ok, anchor).toBe(true);
+      expect(v.hints.some((h) => h.key === "hint.belayer_unsecured"), anchor).toBe(true);
+    }
+    g.step({ m2: { kind: "belay", climberId: "m1", braking: "knot", knot: K("uiaa"), anchor: "base" } });
+    expect(Object.values(g.state.belays)[0].anchor).toMatchObject({ kind: "base", baseId: base(g, "bp_start") });
+  });
+
+  it("«від бази» needs a built base next to the belayer", () => {
+    const g = new Game(scenario({ hill: steepHill(38, "ground") }));
+    const rope = g.item("rope", "m2").id;
+    g.step({ m2: { kind: "pass", toMemberId: "m1", itemIds: [rope] } });
+    g.step({ m1: { kind: "tie_in", ropeId: rope, knot: K("providnyk_visimka_odnym"), viaCarabiner: false } });
+    const v = engine.validatePlan(g.state, [{ memberId: "m2", params: { kind: "belay", climberId: "m1", braking: "knot", knot: K("uiaa"), anchor: "base" } }]);
+    expect(v.members.m2.reasonKey).toBe("reason.no_base_near");
   });
 
   it("no P1 for a belay set up this step; before «Страховка готова!» the belay does not hold", () => {
@@ -381,15 +395,16 @@ describe("CR-37 free commands / CR-36 «Зрозумів.»", () => {
   });
 });
 
-describe("CR-33 belay options", () => {
-  it("none unless clipped to a base; then base anchor only and only enabled ones", () => {
+describe("CR-33 / CR-47 belay options", () => {
+  it("«від бази» and «від себе» are offered without self-belay; only enabled ones", () => {
     const g = new Game(scenario({ hill: steepHill(38, "ground") }));
-    leaderOnBelay(g, { sameStep: true }); // m1 tied in, m2 clipped to the start base
-    const belayOpts = (m: string) => engine.getActionOptions(g.state, m).filter((o) => o.params.kind === "belay");
-    expect(belayOpts("m3")).toEqual([]);
-    const opts = belayOpts("m2");
+    const rope = g.item("rope", "m2").id;
+    g.step({ m1: { kind: "make_base", basePointId: "bp_start", construction: "sling" }, m2: { kind: "pass", toMemberId: "m1", itemIds: [rope] } });
+    g.step({ m1: { kind: "tie_in", ropeId: rope, knot: K("providnyk_visimka_odnym"), viaCarabiner: false } });
+    const opts = engine.getActionOptions(g.state, "m3").filter((o) => o.params.kind === "belay");
     expect(opts.length).toBeGreaterThan(0);
-    expect(opts.every((o) => o.enabled && o.params.kind === "belay" && o.params.anchor === "base")).toBe(true);
+    expect(opts.every((o) => o.enabled)).toBe(true);
+    expect(new Set(opts.map((o) => (o.params.kind === "belay" ? o.params.anchor : "")))).toEqual(new Set(["base", "body"]));
   });
 });
 

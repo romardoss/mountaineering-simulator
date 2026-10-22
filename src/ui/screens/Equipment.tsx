@@ -74,10 +74,13 @@ function PropsEditor({ it, onChange }: { it: ItemConfig; onChange: (props: ItemP
         <div class="cfg-props">
           {num("lengthM", 20, 60, 5, t("ui.cfg.eq.length_m"))}
           {/* main rope diameter is fixed at 10 mm (CR-16) */}
-          <select value={p.kind} aria-label={t("ui.cfg.eq.kind")} onChange={(e) => onChange({ ...p, kind: (e.target as HTMLSelectElement).value as "static" | "dynamic" })}>
-            <option value="dynamic">{t("ui.cfg.eq.dynamic")}</option>
-            <option value="static">{t("ui.cfg.eq.static")}</option>
-          </select>
+          <label>
+            {t("ui.cfg.eq.kind")}
+            <select value={p.kind} onChange={(e) => onChange({ ...p, kind: (e.target as HTMLSelectElement).value as "static" | "dynamic" })}>
+              <option value="dynamic">{t("ui.cfg.eq.dynamic")}</option>
+              <option value="static">{t("ui.cfg.eq.static")}</option>
+            </select>
+          </label>
           <input type="color" aria-label={t("ui.cfg.eq.color")} value={p.color ?? "#d93636"} onChange={(e) => onChange({ ...p, color: (e.target as HTMLInputElement).value })} />
         </div>
       );
@@ -98,11 +101,7 @@ function PropsEditor({ it, onChange }: { it: ItemConfig; onChange: (props: ItemP
             <input type="checkbox" checked={!!p.locking} onChange={(e) => onChange({ ...p, locking: (e.target as HTMLInputElement).checked })} />
             {t("ui.cfg.eq.locking")}
           </label>
-          <select value={p.shape} aria-label={t("ui.cfg.eq.shape")} onChange={(e) => onChange({ ...p, shape: (e.target as HTMLSelectElement).value as "hms" | "d" | "oval" })}>
-            <option value="hms">{t("ui.cfg.eq.shape.hms")}</option>
-            <option value="d">{t("ui.cfg.eq.shape.d")}</option>
-            <option value="oval">{t("ui.cfg.eq.shape.oval")}</option>
-          </select>
+          {/* no shape choice (CR-43): carabiners stay pear-shaped (HMS) internally */}
         </div>
       );
     case "lanyard":
@@ -156,7 +155,6 @@ const MAX_GROUP = 50;
 
 export function EquipmentScreen() {
   const d = withWeights(draft.value);
-  const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [addType, setAddType] = useState<ItemType>("carabiner");
   const [addCount, setAddCount] = useState(1);
@@ -196,7 +194,6 @@ export function EquipmentScreen() {
     const over = d.team.find((m) => memberLoadKg(data, { ...d, items: next }, m.id) > maxKg + 1e-9);
     if (over) return setError(t("ui.cfg.eq.err_over_max", { member: over.name, max: maxKg }));
     setError(null);
-    if (selected === g.key) setSelected(null);
     updateDraft((x) => ((x.items = next), x));
   };
 
@@ -229,18 +226,9 @@ export function EquipmentScreen() {
 
   const removeGroup = (g: ItemGroup) => {
     const ids = new Set(g.items.map((i) => i.id));
-    if (selected === g.key) setSelected(null);
     updateDraft((x) => ((x.items = x.items.filter((i) => !ids.has(i.id))), x));
   };
 
-  const onMemberClick = (m: MemberConfig) => {
-    if (!selected) return;
-    const g = groups.find((x) => x.key === selected);
-    const it = g && freeOf(g)[0];
-    if (!it) return setSelected(null);
-    assign(it.id, { memberId: m.id, as: "carried" });
-    if (freeOf(g).length <= 1) setSelected(null);
-  };
 
   /** One more piece of group `mine` for member `m` (CR-9): a free piece of the group, else a new copy. */
   const more = (m: MemberConfig, mine: ItemGroup) => {
@@ -258,7 +246,7 @@ export function EquipmentScreen() {
       const label = itemLabel(g.first);
       const less = (e: Event) => (e.stopPropagation(), assign(g.items[g.items.length - 1].id, null));
       return (
-        <span class={`cfg-item ${selected === g.key ? "sel" : ""}`}>
+        <span class="cfg-item">
           <Icon type={g.first.type} /> <span class="grow">{label}</span>
           <span class="cfg-qty">
             <button class="btn small secondary" aria-label={t("ui.cfg.eq.less", { item: label })} title={t("ui.cfg.eq.less", { item: label })} onClick={less}>
@@ -301,18 +289,18 @@ export function EquipmentScreen() {
                 </button>
               )}
             </div>
-            <small class="muted">{t("ui.cfg.eq.click_hint")}</small>
+            <small class="muted">{t("ui.cfg.eq.stock_hint")}</small>
             <div class="cfg-scroll">
               {groups.map((g) => {
                 const it = g.first;
                 const free = freeOf(g).length;
                 const perMember = d.team.map((m) => ({ m, n: g.items.filter((i) => i.assignedTo?.memberId === m.id).length })).filter((x) => x.n > 0);
                 return (
-                  <div class={`cfg-pool-item ${selected === g.key ? "sel" : ""}`}>
+                  <div class="cfg-pool-item">
                     <div class="col" style={{ gap: 4 }}>
-                      <button class="btn-ghost" style={{ textDecoration: "none", color: "inherit" }} aria-pressed={selected === g.key} disabled={free === 0} onClick={() => setSelected(selected === g.key ? null : g.key)}>
+                      <strong>
                         <Icon type={it.type} /> {itemLabel(it)}
-                      </button>
+                      </strong>
                       <PropsEditor it={it} onChange={(props) => editGroup(g, props)} />
                       <span class="cfg-dist">
                         <span>{t("ui.cfg.eq.free_n", { count: free })}</span>
@@ -328,17 +316,6 @@ export function EquipmentScreen() {
                         {t("ui.cfg.eq.count")}
                         <input type="number" min={1} max={MAX_GROUP} value={g.items.length} aria-label={t("ui.cfg.eq.count")} onChange={(e) => setCount(g, Number((e.target as HTMLInputElement).value))} />
                       </label>
-                      <select value="" disabled={free === 0} aria-label={t("ui.cfg.eq.assign")} onChange={(e) => {
-                        const v = (e.target as HTMLSelectElement).value;
-                        const target = freeOf(g)[0];
-                        if (!v || !target) return;
-                        assign(target.id, { memberId: v, as: "carried" });
-                      }}>
-                        <option value="">{t("ui.cfg.eq.assign_one")}</option>
-                        {d.team.map((m) => (
-                          <option value={m.id}>{t("ui.cfg.eq.carried_by", { member: m.name })}</option>
-                        ))}
-                      </select>
                       <small class="muted" title={t("ui.cfg.eq.weight_from_settings")}>
                         {t("ui.cfg.eq.weight_each", { kg: weightOf(it) })}
                       </small>
@@ -356,11 +333,25 @@ export function EquipmentScreen() {
               {d.team.map((m) => {
                 const gear = memberLoadKg(data, d, m.id) - d.weights.backpackBaseKg;
                 return (
-                  <div class={`panel cfg-col ${selected ? "target" : ""}`} onClick={() => onMemberClick(m)} role={selected ? "button" : undefined} tabIndex={selected ? 0 : undefined} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onMemberClick(m)}>
+                  <div class="panel cfg-col">
                     <h3>{m.name}</h3>
                     <WeightBar baseKg={d.weights.backpackBaseKg} gearKg={gear} />
                     <small>{t("ui.cfg.eq.carried")}</small>
                     {memberGroups(m)}
+                    {/* team gear is handed out here, not in the stock panel (CR-42) */}
+                    {groups.length > 0 && (
+                      <select class="cfg-take" value="" aria-label={t("ui.cfg.eq.take", { member: m.name })} onChange={(e) => {
+                        const g = groups.find((x) => x.key === (e.target as HTMLSelectElement).value);
+                        if (g) more(m, g);
+                      }}>
+                        <option value="">+ {t("ui.cfg.eq.take_one")}</option>
+                        {groups.map((g) => (
+                          <option value={g.key}>
+                            {itemLabel(g.first)} ({t("ui.cfg.eq.free_n", { count: freeOf(g).length })})
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 );
               })}

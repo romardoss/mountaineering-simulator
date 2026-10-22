@@ -34,3 +34,5 @@
 8. **Idle stroll and tree spots** (CR-30, CR-31): free members in safe zones stroll a little now and then; every large tree is a base spot.
 9. **New preset** «Осінній Лист 2026 2.2»: 39 m competition stage, slope up to 50°, 5 ППС on small trees, large tree at the finish.
 10. **Game screen batch** (CR-32 … CR-41): parallax fix, belay options by clip state, «Страховка готова!» after setup, hover command button, «Зрозумів.», free commands, click tree/rock for a base, sling base by default with warning, gear icons ×N on cards, no «у нормі».
+11. **Equipment and knot dialog** (CR-42 … CR-45): stock-only pool, allocation from member panels, no carabiner shapes, labelled rope type, fixed knot-dialog footer.
+12. **Setup navigation and belay anchors** (CR-46, CR-47): «Назад» / «Далі» together on the right; belay «від бази» / «від себе» without self-belay.

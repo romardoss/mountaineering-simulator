@@ -117,15 +117,14 @@ export function getActionOptions(ctx: ReadCtx, m: MemberId): ActionOption[] {
     for (const c of kinds) add({ id: `base:${bp.id}:${c}`, group: "base", labelKey: `action.make_base.${c}`, labelParams: { base: bp.id, anchor: bp.anchorType }, params: { kind: "make_base", basePointId: bp.id, construction: c } });
   }
 
-  // belay: only for a member clipped to a base, base anchor only, enabled only (CR-33)
-  const clippedToBase = attachmentsOf(st, m).some((a) => a.target.kind === "base" && a.method !== "hand");
-  for (const other of clippedToBase ? Object.values(st.members) : []) {
+  // belay «від бази» / «від себе», enabled ones only (CR-33, CR-47)
+  for (const other of Object.values(st.members)) {
     if (other.id === m || harnessNodes(st, other.id).length === 0) continue;
     const ok = harnessNodes(st, other.id).some(({ rope }) => rope.nodes.some((n) => n.attach.kind === "free" && near(n.pos.s)));
     if (!ok) continue;
     const mode = belayMode(ctx, m, other.id);
     for (const braking of ["knot", "device"] as const) {
-      for (const anchor of ["base"] as const) {
+      for (const anchor of ["base", "body"] as const) {
         const p: ActionParams = { kind: "belay", climberId: other.id, braking, anchor };
         add(
           { id: `belay:${other.id}:${braking}:${anchor}`, group: "belay", labelKey: `action.belay.${mode}`, labelParams: { climber: other.id, braking, anchor }, params: p, needs: braking === "knot" ? { knot: { context: mode === "lower" ? "BELAY_LOWER" : "BELAY_UPPER" } } : undefined },

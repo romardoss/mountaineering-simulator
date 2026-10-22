@@ -87,8 +87,6 @@
   "ui.cfg.eq.pool": "What we take",
   "ui.cfg.eq.catalog": "Catalog",
   "ui.cfg.eq.add": "Add",
-  "ui.cfg.eq.click_hint": "Select an item, then click a member — they get one piece. Or use the \"to whom\" list.",
-  "ui.cfg.eq.assign": "Assign to",
   "ui.cfg.eq.carried_by": "{member}: carries",
   "ui.cfg.eq.remove": "Remove",
   "ui.cfg.eq.unassign": "Unassign",
@@ -153,7 +151,6 @@
   "ui.cfg.hill.base_spots": "Base spots (bases are built by the team during the game)",
   "ui.cfg.team.number": "Member #{n}",
   "ui.cfg.eq.count": "Count",
-  "ui.cfg.eq.assign_one": "Give one to…",
   "ui.cfg.eq.free_n": "unassigned: {count}",
   "ui.cfg.lib.title": "Obstacle constructor",
   "ui.cfg.lib.hint": "Create and edit hills here. Built-in presets can only be copied. A game always uses one of the ready hills.",
@@ -185,5 +182,8 @@
   "ui.cfg.season.spring.desc": "fresh green; rain and mud are common.",
   "ui.cfg.season.autumn.desc": "yellow leaves; rain and mud are most likely.",
   "ui.cfg.season.weather_odds": "rain: {rain} % · mud: {mud} %",
-  "ui.cfg.hill.auto_tree_spots": "Every large tree is a base spot automatically (a paler flag on the preview)."
+  "ui.cfg.hill.auto_tree_spots": "Every large tree is a base spot automatically (a paler flag on the preview).",
+  "ui.cfg.eq.stock_hint": "This is the prepared team stock. Hand it out in the member columns («+ Take…», − / +).",
+  "ui.cfg.eq.take": "Take gear: {member}",
+  "ui.cfg.eq.take_one": "Take…"
 }

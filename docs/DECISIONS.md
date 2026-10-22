@@ -93,4 +93,5 @@ ADR-lite log of interpretations of `PRD.md` v0.1 and deviations from it (PRD §0
 31. **D-69 Direct base warning** (CR-39, owner answer): sling + locking carabiner is the default; without them the player confirms a direct base.
 32. **D-70 Member card gear** (CR-40, owner answer): the card lists only team gear (icons ×N); the individual set is identical for everybody and sits behind one icon with a tooltip.
 33. **D-71 Parallax** (CR-32): the effect is kept; the fixes are same-frame following, textures per view height and a padded layer height.
-
+34. **D-72 Stock vs allocation** (CR-42 … CR-44): the pool keeps its count editor (the stock is still prepared there); only allocation moved to the member panels. Carabiners keep `shape: "hms"` internally because the UIAA rule and the «no HMS» warning use it; the player just no longer chooses it. The rope length / kind editor already existed — it only got a visible label.
+35. **D-73 Belay anchors** (CR-47, owner answers): «від бази» = the existing base anchor (braking on the base carabiner), now available to any belayer standing next to a built base; «від себе» = the existing body anchor. The self-secure requirement of D-61 is dropped (a learning hint remains); «Страховка готова!» is still required before the belay holds. An unsecured body belayer who is pulled off falls as before (D-26).

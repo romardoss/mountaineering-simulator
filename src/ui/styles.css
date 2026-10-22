@@ -128,6 +128,8 @@ th { font-family: var(--font-title); font-size: 9px; font-weight: normal; }
 .modal { max-width: min(920px, 94vw); max-height: 90vh; overflow: auto; }
 .modal-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .modal-head h2 { margin: 0; flex: 1; }
+.modal-footer { position: sticky; bottom: -12px; display: flex; gap: 8px; align-items: center; margin: 10px -14px -12px; padding: 8px 14px; background: var(--paper); border-top: 2px solid var(--ink); z-index: 1; }
+.modal-footer .spacer { flex: 1; }
 
 /* ---------------------------------------------------------------- menu */
 .menu-screen { position: relative; min-height: 100%; display: flex; flex-direction: column; }

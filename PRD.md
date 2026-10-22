@@ -300,7 +300,7 @@ Every item has a weight. The values below are the standard weights; they are set
 ### 9.3 Equipment configuration screen
 
 1. Left: **pool** of team items the team takes (add from catalog, set properties, set count). **Individual equipment is not in the pool**: every member automatically gets the same personal set — шолом, страхувальна система, страхувальні рукавиці, спусковий пристрій, жумар, вус самостраховки, two прусики; in winter also кішки and льодоруб. Member columns show only carried team items (no «Одягнено» list). Carabiner names do not mention HMS; the main rope is always 10 мм (no diameter option). Identical items are shown as one row with a count (e.g. one «Карабін» row with count 10), not as a list of copies. Each member's carried list is grouped the same way and has − / + buttons to change how many pieces of an item (e.g. «петлі», «карабіни») that member carries.
-2. Right: one column per member. Drag-and-drop or select-to-assign items to a member as `worn` or `carried`.
+2. Right: one column per member. The left pool is only the prepared team stock (totals and characteristics); team items are handed out from each member's column («+ Взяти…», − / +). Carabiners have no shape choice; the main rope has length and static / dynamic.
 3. Each item must be assigned to a member before the start. Unassigned items are not taken (a warning lists them).
 4. Pre-tied structures in configuration: a cord can be pre-tied into a loop (knot chosen from the `LOOP_CORD` context, §13.3). This is part of configuration and counts in knot statistics as "pre-tied".
 5. Button «Типовий набір» (learning mode only) auto-fills a recommended kit for the selected hill and team size (data: `src/data/presets/kits/*.json`). The player may then edit it.
@@ -391,8 +391,8 @@ Each action specification: parameters → preconditions (physical; failing ones 
 ### 11.3 Організувати страховку (Make belay)
 
 1. Parameters: belayer (self), climber (member tied into the same rope), mode (`lower` / `upper`), braking method (`belay_device` or friction knot from context `BELAY_LOWER` / `BELAY_UPPER`, e.g. УІАА on an HMS carabiner), anchor (`base` the belayer is self-secured to, or `body` — belaying without anchor).
-2. Preconditions: belayer adjacent to the rope and **self-secured at a base**; has device or locking carabiner; climber is tied into that rope.
-3. Sequence: self-secure → set up the belay → shout «Страховка готова!» (next step). **The belay catches a fall only after «Страховка готова!»**; there is no «command missing» warning before the belay exists.
+2. Preconditions: belayer adjacent to the rope; has device or locking carabiner; climber is tied into that rope. Two options: «від бази» (braking on the base carabiner, needs a base next to the belayer) and «від себе» (braking on the belayer's harness). Self-securing first is recommended (learning hint) but not required.
+3. Sequence: (self-secure →) set up the belay → shout «Страховка готова!» (next step). **The belay catches a fall only after «Страховка готова!»**; there is no «command missing» warning before the belay exists.
 4. Effects: creates an active belay relation. It remains active until stopped (the «Зняти страховку» parameter of the same action — correct after the climber's «Сам!», no command needed) or until the belayer does any other non-command action — then the belay is **inactive for that step** (distracted belayer).
 4. Rope management (paying out / taking in) is automatic while the belay is active and the belayer is not busy. If the braking method cannot pay out rope (e.g. Гарда in lower belay), the climber cannot move away from the belayer — the engine emits a learning event (§13.6).
 5. Belay with `anchor: body` on a section ≥ 25°: if the climber falls, the belayer may be pulled (§14.3).

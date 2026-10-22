@@ -22,16 +22,19 @@ export function FlowNav({ current, nextDisabled, onNext, nextLabel }: { current:
   const prev: RouteName = i <= 0 ? "menu" : FLOW[i - 1];
   const next = FLOW[i + 1];
   return (
+    // step list on the left, «Назад» and «Далі» together on the right (CR-46)
     <div class="cfg-nav">
-      <button class="btn secondary" onClick={() => go(prev)}>
-        ← {t("ui.back")}
-      </button>
       <FlowSteps current={current} />
-      {(next || onNext) && (
-        <button class="btn" disabled={nextDisabled} onClick={() => (onNext ? onNext() : go(next))}>
-          {nextLabel ?? t("ui.next")} →
+      <span class="cfg-nav-buttons">
+        <button class="btn secondary" onClick={() => go(prev)}>
+          ← {t("ui.back")}
         </button>
-      )}
+        {(next || onNext) && (
+          <button class="btn" disabled={nextDisabled} onClick={() => (onNext ? onNext() : go(next))}>
+            {nextLabel ?? t("ui.next")} →
+          </button>
+        )}
+      </span>
     </div>
   );
 }
