@@ -5,6 +5,7 @@ import { data, draft, go, route } from "../../app/store";
 import { deleteScenario, saveScenario, savedScenarios } from "../../app/controller";
 import { downloadJson, pickJsonFile } from "../../app/persistence/storage";
 import { validateScenarioJson } from "../../app/persistence/importScenario";
+import { normaliseGear } from "../../app/gear";
 import { validateScenario } from "../../engine/scenario/validate";
 import type { Scenario } from "../../engine/model/types";
 import { Msg, TopBar } from "../components/common";
@@ -22,7 +23,7 @@ export function ScenariosScreen() {
   const back = route.value.back ?? "menu";
 
   const load = (sc: Scenario) => {
-    draft.value = structuredClone(sc);
+    draft.value = normaliseGear(structuredClone(sc));
     go("readiness");
   };
 

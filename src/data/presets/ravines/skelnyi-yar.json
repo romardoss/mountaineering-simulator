@@ -1,0 +1,28 @@
+{
+  "id": "skelnyi-yar",
+  "nameKey": "preset.ravine.skelnyi_yar",
+  "type": "ravine",
+  "routeType": "descent_ascent",
+  "startZoneM": 8,
+  "finishZoneM": 8,
+  "bottomZoneM": 4,
+  "sections": [
+    { "lengthM": 8, "angleDeg": 30, "surface": "grass" },
+    { "lengthM": 8, "angleDeg": 50, "surface": "rock" }
+  ],
+  "ascentSections": [
+    { "lengthM": 8, "angleDeg": 50, "surface": "rock" },
+    { "lengthM": 8, "angleDeg": 30, "surface": "grass" }
+  ],
+  "trees": [
+    { "id": "t1", "s": 2, "size": "large", "kind": "conifer" },
+    { "id": "t2", "s": 6, "size": "large", "kind": "conifer" },
+    { "id": "t3", "s": 26, "size": "small", "kind": "conifer" },
+    { "id": "t4", "s": 46, "size": "large", "kind": "conifer" },
+    { "id": "t5", "s": 50, "size": "large", "kind": "conifer" }
+  ],
+  "basePoints": [
+    { "id": "bp_start", "s": 6, "anchorType": "tree", "treeId": "t2" },
+    { "id": "bp_finish", "s": 46, "anchorType": "tree", "treeId": "t4" }
+  ]
+}

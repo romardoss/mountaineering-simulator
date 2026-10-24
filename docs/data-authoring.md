@@ -18,6 +18,8 @@ All game rules live in JSON files under `src/data/` (PRD §0.2.3, §21). You can
 | `individual.json` | Personal equipment every member gets automatically (`always`, plus `winter`); these types are never in «Що беремо» |
 | `seasons.json` | Rain and mud probability per season and how weather changes surfaces |
 | `presets/hills/*.json` | Hill presets. Sections start after the start zone (`s = startZoneM`); trees and base points use `s` in metres along the path |
+| `presets/ravines/*.json` | Ravine presets (`type: "ravine"`, `routeType: "descent_ascent"`): `sections` go down from the start bank, `bottomZoneM` is the flat bottom, `ascentSections` climb to the finish bank. Both banks need a base spot (large trees count). Register a new file in `src/data/load.ts` (`ravinePresets`) |
+| `ravine.json` | Ravine rules: поліспаст ratio and carabiners, tension needed for «good», speed along the перила and on sagging перила, score and penalty points per lost item |
 | `presets/kits/typical.json` | «Типовий набір»: team gear per member and per team (individual equipment is not part of it) |
 
 ## Texts

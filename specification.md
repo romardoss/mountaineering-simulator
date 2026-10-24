@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Document version | 1.1 |
-| Date | 2026-10-21 |
-| Describes | Implementation state of commit "Implement MVP" (M0–M5) + owner change requests CR-1…CR-47 (§27) |
+| Document version | 1.2 |
+| Date | 2026-10-24 |
+| Describes | Implementation state of commit "Implement MVP" (M0–M5) + owner change requests CR-1…CR-72 (§27) |
 | Product source | `PRD.md` v0.1 |
 | Audience | AI coding agents and human reviewers |
 
@@ -103,13 +103,14 @@ src/
     scenario/kit.ts         item factory, «Типовий набір»
     stats/stats.ts          computeStats, items left
     index.ts                createEngine (public API)
-  data/                     JSON rules (S§6) + load.ts + schemas/
-  app/                      store, controller, settings, persistence
+  data/                     JSON rules (S§6) + load.ts + schemas/ + presets/{hills,ravines,kits}
+  app/                      store, controller, settings, persistence, gear.ts (rope colours, legacy gear)
   i18n/                     i18n.ts + locales/<uk|en>/<area>.json
   ui/                       App router, screens, panels, dialogs, components, CSS
   game/                     Phaser view (S§20)
 tests/
   engine/dsl.ts             scenario DSL
+  fixtures/hills/           former presets kept for tests (CR-48)
   engine/unit/              unit tests
   engine/scenarios/         PRD §24.2 scenario tests
   data/                     data + locale tests
@@ -126,7 +127,7 @@ Dependency direction: `ui`, `game` → `app` → `engine`; `ui`/`game` → `i18n
 
 ## 3. Architecture overview ✅
 
-1. **Data layer** (`src/data`): JSON + `load.ts` exporting `gameData: GameData` (frozen), `hillPresets: HillConfig[]` (default first), `kits: KitDef[]`.
+1. **Data layer** (`src/data`): JSON + `load.ts` exporting `gameData: GameData` (frozen), `hillPresets: HillConfig[]` (default first), `ravinePresets: HillConfig[]` (CR-52), `obstaclePresets` (both), `kits: KitDef[]`.
 2. **Engine** (`src/engine`): `createEngine(gameData)` returns pure functions over plain JSON state.
 3. **Application** (`src/app`): signals store, `GameController` functions, settings, `localStorage` persistence, scenario import.
 4. **Presentation**: Preact DOM UI for every screen and panel; Phaser canvas only for the hill view inside the game screen.
@@ -159,7 +160,9 @@ All entities are plain JSON (no classes, Maps, cycles). Ids are strings. Generat
 | `weights` | `EquipmentWeights` | snapshot of the weight settings (S§18.5) written by `startGame`; the only source of every weight in the game |
 | `maxSteps` | `number \| null` | loss when reached |
 
-`HillConfig`: `id, nameKey?, name?, type:"hill", routeType ("ascent"|"descent"|"ascent_descent"), startZoneM, finishZoneM, summitZoneM?, sections: SectionConfig[], descentSections?: SectionConfig[], trees: Tree[], basePoints: BasePoint[]`. A scenario embeds a **copy** of the hill chosen from the obstacle library (S§18.6), so later edits of the library hill never change saved scenarios.
+`HillConfig`: `id, nameKey?, name?, type: "hill" | "ravine", routeType ("ascent"|"descent"|"ascent_descent"|"descent_ascent"), startZoneM, finishZoneM, summitZoneM?, sections: SectionConfig[], descentSections?: SectionConfig[], bottomZoneM?, ascentSections?: SectionConfig[], trees: Tree[], basePoints: BasePoint[]`. A scenario embeds a **copy** of the obstacle chosen from the obstacle library (S§18.6), so later edits of the library hill never change saved scenarios.
+
+**Ravine «яр»** (CR-52): the same `HillConfig` shape with `type: "ravine"`, `routeType: "descent_ascent"`: start bank (start zone) → `sections` going **down** → flat bottom of `bottomZoneM` (default 4) → `ascentSections` going **up** → finish bank (finish zone). The start and finish zones are the two **banks**. A rope fixed to bases on both banks is the **перила** over the gap (S§9.5).
 `SectionConfig = { lengthM, angleDeg, surface: "grass"|"ground"|"rock"|"scree" }`. `Tree = { id, s, size: "small"|"large", kind?: "conifer"|"deciduous" }`. `BasePoint = { id, s, anchorType: "tree"|"rock_outcrop"|"bolt", treeId? }`.
 
 **Base points are not bases**. A base point is only a *place where a base can be built* (a natural or artificial anchor). The route never contains ready-made bases: `GameState.bases` is always empty at step 0 and every base is built by a team member with `make_base` (S§9.2). There is no scenario field for pre-built bases. A hill may have no base points at all except the mandatory one in the finish zone (S§17.2.1). In UI text base points are called «місце для бази» / "base spot", never «база». **Every large tree is a base spot by default** (D-66): `basePointsOf(hill)` (`geometry/hill.ts`, memoised by hill identity) returns the configured base spots plus `{ id: "bp@<treeId>", s, anchorType: "tree", treeId }` for each `large` tree without a configured spot (same tree, or a spot within 0.5 m). Small trees are base spots only where configured. Engine (options, make_base, anchor kind / support, start position, validation), renderer, map icon and labels all use `basePointsOf`.
@@ -167,9 +170,9 @@ All entities are plain JSON (no classes, Maps, cycles). Ids are strings. Generat
 `MemberConfig = { id, name, appearance: { row: 0..6, jacketColor? } }` (D-36, D-37). Members have no per-member base weight: everybody carries the same base backpack, `weights.backpackBaseKg` (default 15 kg in every season), which is set only in Settings. Members have **no role**: all members are equal and the team order (index in `team`) is the only ordering. The former `role` field (`leader|member|last`) is removed from the model, the engine, the UI and the data; imported files that still contain `role` are accepted and the field is dropped (S§18.4). `appearance.row` is not chosen by the player: it is assigned automatically to a random row not used by another member (S§19.2.5).
 
 `ItemConfig = { id, type, props, assignedTo: { memberId, as: "worn"|"carried" } | null }` — no weight: an item's weight is always `defaultWeight(scenario.weights, type, props)` (S§17.3).
-`ItemProps`: `lengthM, diameterMm, kind (static|dynamic), color, lengthCm, locking, shape (hms|d|oval), model (atc|figure8), arms, loopKnot { knotId, control }`.
+`ItemProps`: `lengthM, diameterMm, kind (static|dynamic), color, lengthCm, locking, shape (hms|d|oval), model (atc|figure8), arms, loopKnot { knotId, control }`. The configuration screens offer only slings of 120 / 240 cm (CR-49) and locking carabiners (CR-51); the engine still accepts `lengthCm: 60` and `locking: false` (old saves, tests).
 
-`EquipmentWeights = { backpackBaseKg, ropePerMeterKg (at 10 mm), cordPerMeterKg, slingKg { 60, 120, 240 }, carabinerKg { locking, nonLocking }, belayDeviceKg { atc, figure8 }, harnessKg, helmetKg, lanyardKg, glovesKg, cramponsKg, iceAxeKg, ascenderKg }`. Defaults in `src/data/weights.json`; the values in use come from Settings.
+`EquipmentWeights = { backpackBaseKg, ropePerMeterKg (at 10 mm), cordPerMeterKg, slingKg { 60, 120, 240 }, carabinerKg { locking, nonLocking }, belayDeviceKg { atc, figure8 }, harnessKg, helmetKg, lanyardKg, glovesKg, cramponsKg, iceAxeKg, ascenderKg }`. Defaults in `src/data/weights.json`; the values in use come from Settings. `slingKg.60` and `carabinerKg.nonLocking` stay for old configurations but are not shown in Settings (CR-49, CR-51).
 Item types: `rope, cord, sling, carabiner, belay_device, ascender, harness, helmet, lanyard, gloves, crampons, ice_axe, backpack` (backpack is implicit, D-37; `ascender` = «жумар», a carried item with no action yet, D-51).
 
 **Individual equipment** (D-46, D-49, D-50): every member gets the **same** personal set from `src/data/individual.json`; it is never part of `scenario.items`, is not offered in «Що беремо» (catalog / pool) and is not shown on the equipment screen. `always`: helmet (worn), harness (worn), belay gloves «страхувальні рукавиці» (worn), belay device ATC «спусковий пристрій» (carried), ascender «жумар» (carried), 2-arm lanyard «вус самостраховки» (carried), **2 prusik loops** «прусики» (cord 1.5 m × 6 mm pre-tied with Грепвайн, carried); `winter` adds crampons (worn) and ice axe (carried). `individualKit(data, season)` returns the entries; `isIndividual(type)` is true for every type in `always ∪ winter` (`scenario/kit.ts`). Configured items of these types (old files) are ignored.
@@ -181,7 +184,7 @@ Item types: `rope, cord, sling, carabiner, belay_device, ascender, harness, helm
 | `schemaVersion`, `scenario` | immutable copy of the scenario |
 | `step` | number of resolved steps |
 | `rng` | `{ algo: "mulberry32", s }` |
-| `outcome` | `in_progress \| won \| lost \| aborted` |
+| `outcome` | `in_progress \| won \| completed \| lost \| aborted` — `completed`: ravine finished by the whole team with equipment left behind (CR-58) |
 | `simTimeS` | Σ step durations |
 | `members` | `MemberState`: config fields (`id, name, appearance`) + `baseWeightKg` (= `weights.backpackBaseKg`) + `abilities: {}` (never read), `pos`, `status (ok\|fallen_caught\|injured\|finished)`, `forcedSkipNextStep` |
 | `items` | `ItemState`: `id, type, weightKg` (computed once by `createGame` from `scenario.weights`), `props, location` — the id set equals `itemIds` forever |
@@ -189,6 +192,7 @@ Item types: `rope, cord, sling, carabiner, belay_device, ascender, harness, helm
 | `knots` | `KnotInstance` per knot currently tied |
 | `weather` | `"dry" \| "mud" \| "rain"` — rolled once by `createGame` from the season (S§6.5), constant for the whole game |
 | `bases`, `attachments`, `belays` | structures (below); all empty at step 0 — bases exist only after `make_base` |
+| `crossings` | `Record<ropeId, CrossingState>` — ravine перила with a поліспаст (CR-54); `{}` at step 0, absent in games saved before CR-54 (read through `crossingsOf`) |
 | `hazards.pendingRockfalls` | `PendingRockfall[]` |
 | `protocol` | `ProtocolState` (S§13) |
 | `stats` | `StatsCounters` (S§14) |
@@ -201,7 +205,7 @@ Item types: `rope, cord, sling, carabiner, belay_device, ascender, harness, helm
 type ItemLocation =
   | { kind: "carried"; memberId }
   | { kind: "worn"; memberId }
-  | { kind: "in_use"; structure: StructureRef }   // rope | base | attachment | belay | knot
+  | { kind: "in_use"; structure: StructureRef }   // rope | base | attachment | belay | knot | crossing
   | { kind: "on_ground"; pos };
 ```
 
@@ -214,6 +218,7 @@ Which items are `in_use` where:
 | `attachment` | carabiner (`lanyard_carabiner`); cord + carabiner (`grabbing_knot`); none (`hand`). The lanyard stays `carried`. |
 | `belay` | device + carabiner (`device`) or carabiner(s) (`knot`) |
 | `knot` | carabiner of a tie-in via carabiner, or own carabiner of a Карабінна удавка on a carabiner-less base |
+| `crossing` | поліспаст: 2 carabiners + 1 prusik cord of the builder; a separate здьорг rope (CR-54, CR-57) |
 
 ### 4.5 Rope layout
 
@@ -224,7 +229,8 @@ Which items are `in_use` where:
    3. `base { baseId, mode: "running" }` — runs through the base carabiner (intermediate protection).
    4. `base { baseId, mode: "doubled" }` — doubled around / through the anchor (descent).
    5. `belay { belayId }` — through the belayer's braking; follows the belayer.
-   6. `free` — lying / hanging end.
+   6. `held { memberId }` — a rope end held by hand, no knot, no device: «Взяти кінець мотузки» (CR-65), also the супровід (CR-56); follows the member, the rope length limits their moves (S§10.3), a falling member lets go (S§12.2).
+   7. `free` — lying / hanging end.
 3. Used length = Σ |sᵢ − sᵢ₊₁| + `knotRopeAllowanceM` × (knots whose `itemId` is this rope). Must be ≤ `props.lengthM`.
 4. **Derived segments** (never stored):
    1. *Fixed segment*: consecutive nodes both `base` (any mode) at different `s`; `lower`/`upper` by elevation.
@@ -238,6 +244,7 @@ Which items are `in_use` where:
 3. `Attachment = { id, memberId, method (hand|lanyard_carabiner|grabbing_knot), target: segment{ropeId,lowerNodeId,upperNodeId} | base{baseId}, itemIds, knotId, step }`.
 4. `BelayRelation = { id, belayerId, climberId, ropeId, mode (lower|upper), braking: device{itemId,carabinerIds} | knot{knotId,carabinerIds}, anchor: base{baseId} | body, step, distanceAtSetM, inactiveThisStep }`.
 5. `PendingRockfall = { id, createdStep, sourceMemberId, pos, threatened[], warned }`.
+6. `CrossingState = { ropeId, baseId, itemIds, builtBy, ratio (n of 1:n, CR-61; absent in older saves = 3), tension, secured, sagged: MemberId[], retrieval: { pullRopeId, by } | null }` (CR-54 … CR-57): `baseId` is the start-bank base of the перила where the поліспаст sits; `tension` = pullers × ratio of the last coordinated pull; `secured` = tied off; `sagged` = members who already crossed on weak tension (one penalty each).
 
 ### 4.7 Events
 
@@ -247,10 +254,10 @@ Which items are `in_use` where:
 
 ## 5. Geometry ✅ (`engine/geometry/hill.ts`)
 
-1. Path layout (D-10): `[0, startZoneM]` flat start zone → sections from `s = startZoneM` → (ascent_descent) flat summit zone of `summitZoneM` (default 6) → descent sections → flat finish zone of `finishZoneM`. `finishStart` = end of last section; `totalLength = finishStart + finishZoneM`.
-2. `normaliseSections` adds `direction` (`up` for ascent sides, `down` for descent) and `startS`.
+1. Path layout (D-10): `[0, startZoneM]` flat start zone → sections from `s = startZoneM` → (ascent_descent) flat summit zone of `summitZoneM` (default 6) → descent sections → flat finish zone of `finishZoneM`; (descent_ascent, ravine, CR-52) descent sections → flat **bottom** zone of `bottomZoneM` (default 4) → ascent sections. `finishStart` = end of last section; `totalLength = finishStart + finishZoneM`.
+2. `normaliseSections` adds `direction` (`up` for ascent sides, `down` for descent) and `startS`; geometry has `summit` and `bottom` (`{ s0, s1 } | null`).
 3. `buildHillGeometry(hill)` → `segments[]` each `{ s0, s1, angleDeg, sign (+1 up, −1 down, 0 flat), surface, section, zone, x0, y0 }`; memoised in a `WeakMap` by object identity — **editors must create a new hill object on every change**.
-4. `toWorld(s)` → metres `(x, y)`, y up. `elevationAt`, `angleAt`, `zoneAt` (`start|summit|finish|slope`), `isSafeZone` (any zone except slope), `steepestBetween(a,b)`, `downhillDir(s)` (−1/+1 in `s`; in flat zones looks at the neighbouring slope; summit → descent side).
+4. `toWorld(s)` → metres `(x, y)`, y up. `elevationAt`, `angleAt`, `zoneAt` (`start|summit|bottom|finish|slope`), `isSafeZone` (any zone except slope), `steepestBetween(a,b)`, `downhillDir(s)` (−1/+1 in `s`; in flat zones looks at the neighbouring slope; summit → descent side; bottom → +1). Ravine helpers (CR-52): `isRavine(hill)`, `bankAt(geo, s)` (`start` / `finish` zone, else null = in the gap), `sAtWorldX(geo, x)` (bisection, x grows with s).
 5. "Below" and "lower node" always compare elevation (D-3). Distances (fall, slide, move) use path distance `|Δs|`.
 
 ---
@@ -292,17 +299,19 @@ All numbers below are current defaults. Types: `engine/data/types.ts`.
 
 | File | Shape |
 |---|---|
-| `actions.json` | durations (S) — S§9 table |
-| `commands.json` | `[{ key, textKey, hintKey, wrongKeys[2] }]` × 11 (S§13.1) |
+| `actions.json` | durations (S) — S§9 table; `detach.release 5`, `detach.haul 30`; `ravine { holdEscort 10, takeEnd 5, buildPulley 90, rigRetrieval 60, retrieve 30 }` |
+| `commands.json` | `[{ key, textKey, hintKey, wrongKeys[2] }]` × 13 (S§13.1) |
 | `protocol.json` | `[{ id P1–P7, enabled, severity, messageKey "rule.Pn", physical }]` |
 | `equipment.json` | `[{ type, nameKey, icon, wearable, defaults: ItemProps }]` (no weights) |
 | `individual.json` | `{ always: KitEntry[], winter: KitEntry[] }` — the per-member individual equipment (S§4.2) |
 | `seasons.json` | per season `{ pRain, pMud }` and `surfaceMap` (S§6.5) |
-| `weights.json` | default `EquipmentWeights` (S§4.2): backpack 15 kg; rope 0.07 kg/m at 10 mm; cord 0.03 kg/m; sling 60/120/240 cm → 0.03/0.06/0.12; carabiner locking 0.08 / non-locking 0.05; device ATC 0.08 / figure-8 0.10; harness 0.4; helmet 0.35; lanyard 0.15; gloves 0.1; crampons 0.9; ice axe 0.5; ascender 0.2. Exposed as `gameData.weights` |
+| `weights.json` | default `EquipmentWeights` (S§4.2): backpack 15 kg; rope 0.07 kg/m at 10 mm (main rope default 55 m, CR-50, and **static**, CR-60: `equipment.json`, `typical.json`); cord 0.03 kg/m; sling 60/120/240 cm → 0.03/0.06/0.12; carabiner locking 0.08 / non-locking 0.05; device ATC 0.08 / figure-8 0.10; harness 0.4; helmet 0.35; lanyard 0.15; gloves 0.1; crampons 0.9; ice axe 0.5; ascender 0.2. Exposed as `gameData.weights` |
 | `knots.json` | 24 × `KnotDef` (S§11.1) |
-| `contexts.json` | `{ <CONTEXT>: { nameKey, ratings: { knotId: rating \| { rating, requires, otherwise } }, default, deviceRating? } }` |
+| `contexts.json` | `{ <CONTEXT>: { nameKey, ratings: { knotId: rating \| { rating, requires, otherwise, messageKey } }, default, deviceRating? } }`; ravine перила contexts `PERILA_FINISH` / `PERILA_START` (CR-64, S§11.2) |
 | `glossary.json` | list of `term.*` keys (PRD §4) |
-| `presets/hills/*.json` | `HillConfig` × 6 (S§6.4) — the built-in, read-only part of the obstacle library (S§18.6) |
+| `presets/hills/*.json` | `HillConfig` × 3 (S§6.4, CR-48) — the built-in, read-only part of the obstacle library (S§18.6) |
+| `presets/ravines/*.json` | ravine `HillConfig` × 1 (S§6.4, CR-52) |
+| `ravine.json` | `RavineRules` (CR-54 … CR-58): `pulleyRatios [2, 3, 4]` (selectable 1:n, CR-61), `pullRadiusM 10` (CR-66, CR-70), `pulleyCarabiners 2`, `goodTension 9`, `traverseMoveM 6`, `sagMoveFactor 0.5`, `score { base 100, sagPoints 5, lostItemPoints { rope 20, cord 3, sling 5, carabiner 3, default 5 } }`. Exposed as `gameData.ravine` |
 | `presets/kits/typical.json` | `KitDef` (S§17.3); team entries use `assign: first \| last \| spread_heavy` (team order, no roles) |
 | `schemas/scenario.schema.json` | JSON Schema draft-07 of `Scenario` (import validation) |
 
@@ -310,14 +319,19 @@ All numbers below are current defaults. Types: `engine/data/types.ts`.
 
 | id | Route | Sections (length/angle/surface) | Base points (s) |
 |---|---|---|---|
-| `skhyl-z-derevamy` (default) | ascent | 15/15 grass, 20/28 grass, 20/38 ground, 15/45 rock | start 3 (large tree), mid1 41 (large tree), mid2 61 (outcrop), top 79 (large tree) |
-| `pologyi-travianystyi` | ascent | 20/10, 20/15, 20/20 grass | 3, 26, 70 (trees) |
-| `skelno-osypnyi` | ascent | 15/25 scree, 20/35 scree, 20/45 rock, 15/50 rock | 3 tree, 21 outcrop, 41 bolt, 61 bolt, 79 outcrop |
-| `spusk-zi-schylu` | descent | 15/45 rock, 20/38 ground, 20/28 grass, 15/15 grass | 3 tree, 21 outcrop, 41 tree, 61 tree, 81 tree |
-| `cherez-vershynu` | ascent_descent | preset 1 ascent + summit 6 + 20/35, 20/25, 15/15 grass | 3, 41, 61, summit 79, 102, finish 141 |
+| `skelno-osypnyi` «Скельно-осипний схил» (default) | ascent | 15/25 scree, 20/35 scree, 20/45 rock, 15/50 rock | 3 tree, 21 outcrop, 41 bolt, 61 bolt, 79 outcrop |
+| `cherez-vershynu` «Через вершину» | ascent_descent | 15/15 grass, 20/28 grass, 20/38 ground, 15/45 rock + summit 6 + 20/35, 20/25, 15/15 grass | 3, 41, 61, summit 79, 102, finish 141 |
 | `osinnii-lyst-2026-2-2` «Осінній Лист 2026 2.2» | ascent, stage 39 m (start zone 4, finish zone 4) | 6/20 grass, 7/35 ground, 6/50 ground, 7/42 ground, 5/28 grass | start 2 (tree ⌀ 60 cm girth = small), ППС 9, 14, 19.5, 25, 31 (small trees ≤ 60 cm), finish 37 (tree 1 m girth = large); 16 small decorative trees (no extra base spots) |
 
-All presets use `startZoneM 6`, `finishZoneM 8`, except «Осінній Лист 2026 2.2» (4 / 4, a 39 m competition stage). Base points in the table are base *spots* (anchors); no preset contains a built base. Every preset has a base point in the finish zone; the start and summit base points are optional and kept as convenient anchors.
+All hill presets use `startZoneM 6`, `finishZoneM 8`, except «Осінній Лист 2026 2.2» (4 / 4, a 39 m competition stage). Base points in the table are base *spots* (anchors); no preset contains a built base. Every preset has a base point in the finish zone; the start and summit base points are optional and kept as convenient anchors.
+
+**Only these three hills are offered** on the hill-selection screen (CR-48). The former presets «Схил з деревами», «Пологий трав'янистий схил» and «Спуск зі схилу» are no longer built-in; their JSON lives in `tests/fixtures/hills/` for the tests (DSL `preset()` finds them), and their `preset.hill.*` texts stay so that saved scenarios embedding them still show a name.
+
+Ravine presets (CR-52):
+
+| id | Route | Sides (length/angle/surface) | Trees, base spots (s) |
+|---|---|---|---|
+| `skelnyi-yar` «Скельний яр» | descent_ascent: start bank 8, bottom 4, finish bank 8 (total 52, depth 10.1, span between the bank anchors ≈ 32 m) | down 8/30 grass, 8/50 rock; up 8/50 rock, 8/30 grass | large trees 2, 6 (start bank), 46, 50 (finish bank), small tree 26 (bottom); configured spots `bp_start` 6, `bp_finish` 46; the other large trees are spots by D-66 |
 
 ### 6.5 Seasons and weather (`seasons.json`)
 
@@ -350,11 +364,14 @@ interface Engine {
   getActionOptions(state, memberId): ActionOption[];     // S§9.3
   validatePlan(state, plan): PlanValidation;             // members[m]: main action; commands[m]: the command (CR-37) — ok, reasonKey, hints[], durationS
   resolveStep(state, plan, opts?): { state, events };    // S§8
+  shout(state, memberId, params, opts?): { state, events }; // a command at once, between steps (CR-72, S§13.4)
   evaluateKnot(input): KnotEvaluation;                   // S§11.3
   getStats(state): Stats;                                // S§14
   getOutcome(state): Outcome;
   giveUp(state): GameState;                              // outcome "aborted"
-  replay(scenario, history, opts?): GameState;
+  canFinishLevel(state): boolean;                        // ravine: whole team on the finish bank, nobody injured (CR-58)
+  finishLevel(state): GameState;                         // ravine: "won" if nothing left, else "completed"
+  replay(scenario, history: HistoryEntry[], opts?): GameState; // HistoryEntry = PlannedAction[] (a step) | { shout: PlannedAction } (CR-72)
 }
 ResolveOptions = { rolls?: RollScript; checkInvariants?: boolean /* default true */ }
 ```
@@ -377,11 +394,11 @@ The engine has no module-level state; tests create engines with modified data fr
 
    | # | Phase | Actions |
    |---|---|---|
-   | 1 | `commands` | `command` |
-   | 2 | `detach` | rockfall warnings (S§12.7) and forced-skip events first; then `detach`, `pass`, `pickup`, `wear` |
-   | 3 | `build` | `make_base`, `tie_in`, `fix_rope` |
+   | 1 | `commands` | `command` (on a ravine «Тягнемо!» tensions the перила right here, S§9.5) |
+   | 2 | `detach` | rockfall warnings (S§12.7) and forced-skip events first; then `detach`, `pass`, `pickup`, `wear`, `retrieve` |
+   | 3 | `build` | `make_base`, `tie_in`, `fix_rope`, `build_pulley`, `rig_retrieval` |
    | 4 | `attach` | `attach`, `clip` |
-   | 5 | `belay` | `belay`, `stop_belay` |
+   | 5 | `belay` | `belay`, `stop_belay`, `hold_escort`, `take_end` |
    | 6 | `movement` | protocol pre-check (P1/P2/P4, S§13.2) then `move` |
    | 7 | `hazardRolls` | static-load rolls, terrain fall rolls, rock dislodge rolls |
    | 8 | `hazardResolution` | resolve each queued fall, then rockfall hits |
@@ -405,7 +422,7 @@ Step duration = `max(minStepSeconds, durations of executed actions)`; `simTimeS 
 ### 8.5 Outcome (bookkeeping)
 
 1. Any member `injured` → `lost` (`event.game_lost_injury`).
-2. Else every member in the finish zone (`s ≥ finishStart`) → `won`, all members `finished` (D-31).
+2. Else every member in the finish zone (`s ≥ finishStart`) → `won`, all members `finished` (D-31). **Ravine** (CR-58): `won` only when, in addition, no item is left (`itemsLeft` empty, S§14); otherwise the game goes on so the team can still retrieve the gear, and `finishLevel` (button «Завершити рівень») ends it: `won` with nothing left, else `completed` (level completed, penalties, S§14).
 3. Else `maxSteps` reached → `lost`.
 
 ---
@@ -432,8 +449,8 @@ interface ActionDef<P> {
 |---|---|---|---|---|
 | `skip` | — | — | none | 0 |
 | `command` | `command, recipient, misunderstood?` | known command / member | logs to `protocol.recent`, updates protocol flags (S§13), `event.command`; `misunderstood` → `event.command_misunderstood`, no effect | 5 |
-| `move` | `toward: finish\|start, distanceM, targetS?` (`targetS` = the point chosen with a right-click, display only — the engine ignores it) | `distanceM > 0`; reach ≥ 0.05 (S§10) | moves `min(distanceM, reach)`, syncs harness/belay nodes, distance stats by elevation sign; Гарда clamp → `knot.garda_blocks_feed` | 30 + 1/deg above 15° (max angle at start/end) |
-| `attach` | `method, target, knot?` | target exists; member within segment span ± adjacency or adjacent to base; grabbing only on segments; not the same target+method; one hand max; non-hand ≤ max(1, lanyard arms); items: harness worn (non-hand), lanyard with a free arm + any carabiner, or cord + carabiner; knot chosen for grabbing | creates attachment, items `in_use`; grabbing knot instance (`SELF_BELAY_GRAB`, eval input computed **before** items move); P3 if segment not ready | hand 5, lanyard 15, grabbing 45 (+10 per control knot) |
+| `move` | `toward: finish\|start, distanceM, targetS?` (`targetS` = the point chosen with a right-click, display only — the engine ignores it) | `distanceM > 0`; reach ≥ 0.05 (S§10); on ravine перила (S§9.5) only when they are secured (`reason.traverse_not_secured`) and with a супровід (`reason.no_escort`) | moves `min(distanceM, reach)`, syncs harness/belay/held nodes, distance stats by elevation sign (not on перила: `event.moved_traverse`); Гарда clamp → `knot.garda_blocks_feed` | 30 + 1/deg above 15° (max angle at start/end); on перила 30 |
+| `attach` | `method, target, knot?` | target exists; member within segment span ± adjacency or adjacent to base; grabbing only on segments; ravine перила: not by hand (`reason.traverse_needs_harness`), only from a bank (`reason.traverse_from_bank`); not the same target+method; one hand max; non-hand ≤ max(1, lanyard arms); items: harness worn (non-hand), lanyard with a free arm + any carabiner, or cord + carabiner; knot chosen for grabbing | creates attachment, items `in_use`; grabbing knot instance (`SELF_BELAY_GRAB`, eval input computed **before** items move); P3 if segment not ready | hand 5, lanyard 15, grabbing 45 (+10 per control knot) |
 | `clip` | `ropeId, baseId` | member tied into the rope; adjacent to base; base has carabiner; not already on this rope; carabiner load < max | inserts `running` node next to the member's harness node | 15 |
 | `tie_in` | `ropeId, knot, viaCarabiner` | harness worn; rope carried by member (deploy) or in use with a free **end** adjacent; not already tied in; locking carabiner if `viaCarabiner` | knot `TIE_IN_END`; deploy → nodes `[harness(m), free(m.pos)]`; else the free end becomes `member_harness` | 60 + 10/control |
 | `fix_rope` | `ropeId, baseId, method: knot\|doubled, knot?` | adjacent to base; rope carried, or in use with a fixable node (own harness node at the base, a free end at the base, or a free end within the member's reach, D-17); `doubled` only for carried ropes; not while the member is on belay on that rope; base carabiner not full | knot context from base (S§11.2); carried+knot → `[fixed(base), free(thrown end)]`; carried+doubled → `[free, doubled(base), free]` ends thrown `len/2`; own harness node → replaced by fixed node (tie-in knot removed, D-16); udavka on carabiner-less base takes member's locking carabiner | knot 60 + 10/control; doubled 40 |
@@ -444,6 +461,11 @@ interface ActionDef<P> {
 | `pass` | `toMemberId, itemIds (1–3)` | receiver adjacent, not injured; items carried by giver; receiver ≤ maxKg | items carried by receiver | 10 per item |
 | `pickup` | `itemIds` | items `on_ground` adjacent; ≤ maxKg | carried | 5 per item |
 | `wear` | `itemId` | carried wearable (harness, helmet, gloves, crampons), not already worn type; safe position (safe zone or attached to a base) | worn | 30 |
+| `hold_escort` | `climberId` | ravine (`reason.ravine_only`); not self; climber tied in; holder on a bank (`reason.escort_from_bank`); a `free` node of a rope the climber is tied into adjacent to the holder | node → `held` (S§9.5); engine only — the picker offers `take_end` instead (CR-65) | 10 |
+| `take_end` | `ropeId, nodeId` | an **end** node (`reason.not_rope_end`) of a laid-out rope, `free` (`reason.end_anchored`), adjacent; the member does not hold this rope yet (`reason.already_holding`) | «Взяти кінець мотузки» (CR-65): node → `held` by the member, no knot; the end goes where the member goes (rope length permitting); `fix_rope` can fix a held end at a base | 5 |
+| `build_pulley` | `ropeId, ratio` (1:2 / 1:3 / 1:4 → 2 / 3 / 4, CR-61) | ratio in `ravine.pulleyRatios` (`reason.pulley_ratio`); the rope has a fixed segment from bank to bank (`reason.not_traverse`); no поліспаст yet; adjacent to the **start-bank** anchor node (`reason.pulley_on_start_bank`); 2 carabiners + 1 cord carried (`reason.pulley_needs_items`) | `CrossingState` with the items `in_use` (`crossing`) | 90 |
+| `rig_retrieval` | `ropeId, pullRopeId` | поліспаст exists, no здьорг yet; adjacent to its base; **every other member is on the finish bank** (`reason.not_last`); pull rope ≠ перила and either carried by the member or a rope the member is tied into that is held on the finish bank (`reason.pull_rope_unsuitable`) | carried pull rope → `in_use` (`crossing`); `retrieval` set | 60 |
+| `retrieve` | `ropeId` | здьорг rigged (`reason.no_retrieval`); every member on the finish bank (`reason.team_not_across`); nobody on the перила; pull rope in a layout: nobody tied into it (`reason.pull_rope_tied`) and the member adjacent to one of its nodes; pull rope in the crossing: member adjacent to the перила's finish-bank node | start anchor released: its knot carabiners, the поліспаст, a separate pull rope and the start base (when nothing else uses it) end up `on_ground` at the member; the перила node becomes `free` at the member; the crossing is removed | 30 |
 
 Worn items can never be taken off: there is no «Зняти» action (no taking off the helmet, harness, crampons or gloves). A worn item stays worn until the end of the game; it cannot be passed or dropped.
 
@@ -457,6 +479,10 @@ Worn items can never be taken off: there is no «Зняти» action (no taking 
 | `dismantle_base` | adjacent; no rope node / attachment / belay uses it; ≤ maxKg | base items carried by member | 60 |
 | `coil` | every node adjacent; all nodes `free`; nobody tied/attached/belaying; ≤ maxKg | layout removed, rope carried | 60 |
 | `pull_down` | rope has a `doubled` node or a `fixed` node with a `releasable` knot; member below that anchor along the rope span (D-18); rope unused; no `running` nodes; ≤ maxKg | rope (+ udavka carabiner) carried by member; base stays | 30 |
+| `release` | own `held` node (CR-56) | node → `free` | 5 |
+| `haul` | a node of the rope is held by the member or a free end lies adjacent; every other node `free`; rope unused (CR-56) | every node → `free` at the member (the rope is pulled across) | 30 |
+
+`untie` of the перила node where the поліспаст sits fails with `reason.pulley_on_node`; a rope with a `CrossingState` counts as in use (`coil`, `pull_down`, `haul`).
 
 ### 9.3 Action options for the UI (`actions/options.ts`)
 
@@ -465,23 +491,35 @@ Worn items can never be taken off: there is no «Зняти» action (no taking 
 
 1. Every option is validated with a probe (placeholder knot `providnyk_visimka_odnym` / `uiaa`, smallest item set) so disabled options carry the reason.
 2. Move options: `move:finish` and `move:start`; label `action.move_up|move_down|move_flat_<toward>` from the elevation change 0.5 m ahead (D-11). They need no parameter: `distanceM` = the full reach this step (no metre selection). Moving to an exact point is done with a right-click on the hill view (S§19.3.9).
-3. Generated per context: segment attach (grab, lanyard, hand), base attach, clip, tie-in per rope, fix per rope×base (+ doubled for coiled ropes), make base per base point × construction, belay per climber × braking × anchor — «від бази» (`base`, when a base is adjacent) and «від себе» (`body`) — **only enabled ones** (CR-33, CR-47), stop belay, command, detach per attachment / node / rope / base, pass per adjacent member, pickup, wear. There is no drop («Покласти на землю») action: items reach the ground only through base failures; `pickup` stays. Move options are still generated (reasons, tests) but the action picker does not show them (S§19.3.5).
+3. «Взяти кінець мотузки» per free end of a laid-out rope within reach (group `attach`, any obstacle, CR-65). Ravine only (CR-52): group `ravine`: «Зібрати поліспаст 1:2 / 1:3 / 1:4» per rope with перила and ratio (CR-61), «Підготувати здьорг» at the поліспаст per own carried rope / rope one is tied into; «Здьоргнути» on the finish bank; group `detach`: «Відпустити кінець / супровід», «Вибрати мотузку». Tensioning has no option: it is the command «Тягнемо!» (S§9.5.3). `ropeOfOption(o)` gives the rope of a rope action; `isRopeAction(o)` = it has a rope, or it is self-belay («самостраховка», any `attach`, also to a base), belay («страховка»: `belay`, `stop_belay`, `hold_escort`) or a base (`make_base`, `dismantle_base`, CR-71) — the actions of the hover rope icon (S§19.3.11, CR-70).
+4. Generated per context: segment attach (grab, lanyard, hand), base attach, clip, tie-in per rope, fix per rope×base (+ doubled for coiled ropes), make base per base point × construction, belay per climber × braking × anchor — «від бази» (`base`, when a base is adjacent) and «від себе» (`body`) — **only enabled ones** (CR-33, CR-47), stop belay, command, detach per attachment / node / rope / base, pass per adjacent member, pickup, wear. There is no drop («Покласти на землю») action: items reach the ground only through base failures; `pickup` stays. Move options are still generated (reasons, tests) but the action picker does not show them (S§19.3.5).
 
 ### 9.4 Hints (`assess`, learning mode only)
 
-`hint.move_unprotected` (≥25° and not protected), `hint.belay_not_effective_yet`, `hint.wait_belay_ready`, `hint.crowded_segment`, `hint.hand_no_protection`, `hint.carabiner_slides`, `hint.wait_fixed_rope_ready`, knot evaluation messages, `hint.small_tree_anchor`, `knot.garda_blocks_feed`, `hint.body_belay_steep`, `hint.belay_next_step`, `hint.wait_secured`, `hint.detach_last_protection`. "Protected" = any non-hand attachment or being a belay climber.
+`hint.pulley_next` (ravine), `hint.move_unprotected` (≥25° and not protected), `hint.belay_not_effective_yet`, `hint.wait_belay_ready`, `hint.crowded_segment`, `hint.hand_no_protection`, `hint.carabiner_slides`, `hint.wait_fixed_rope_ready`, knot evaluation messages, `hint.small_tree_anchor`, `knot.garda_blocks_feed`, `hint.body_belay_steep`, `hint.belay_next_step`, `hint.wait_secured`, `hint.detach_last_protection`. "Protected" = any non-hand attachment or being a belay climber.
+
+### 9.5 Ravine crossing (CR-52 … CR-58)
+
+1. **First crossing** (CR-53): a member crosses on the ground — down one side, across the bottom, up the other — on an ordinary belay (S§12.3; with the belayer on the start bank the climber is never above them, so a fall is short). To bring the перила across, the member ties a second rope to the harness (`tie_in`, a separate action): it trails along the path; its other end is fixed at the start-bank base. Rope lengths are path lengths (S§4.5), so a 55 m rope reaches from bank to bank along the ground. On the finish bank the member builds a base and `fix_rope`s their own end there — the rope becomes a fixed segment from bank to bank: the **перила**.
+2. **Поліспаст** (CR-54, CR-61): «Зібрати поліспаст» (`build_pulley`) at the start-bank anchor, with a **selectable ratio 1:2, 1:3 or 1:4** (`ratio` n, one of `ravine.pulleyRatios`, stored in `CrossingState.ratio`; the same gear for every ratio: 2 carabiners + 1 prusik). It is required before crossing: only перила tensioned with it and tied off can be crossed (S§9.5.4).
+3. **Tensioning in one action** (CR-55, CR-66, CR-67, CR-68): first a member **on the finish bank** shouts **«Два штики!»** (`two_hitches`: the far end is tied with a штик that will hold the tension; `protocol.twoHitches` = step; shouted elsewhere it has no effect). Then **one «Тягнемо!»** (`tension`) by a member within `pullRadiusM` (10 m, CR-70) of the поліспаст does everything in the commands phase: every `ok` member within 10 m of it pulls — those not adjacent walk up to it (`event.walks_to_pulley`, a `member.moved` event for the animation) if they are free (not tied in, holding a rope, belaying or clipped to anything; others pull only from where they stand next to it) — tension = pullers × n of the chosen 1:n (`event.tensioned`; e.g. three pullers: 1:2 → 6 weak, 1:3 → 9 good, 1:4 → 12 good), and the перила are **tied off at once** (`secured`). Without an earlier «Два штики!» → `event.tension_no_two_hitches` + mistake `summary.no_two_hitches`, nothing happens; with someone clipped to the перила → `event.tension_traverse_busy`. Shouting again later keeps the higher tension. There are no separate pull / tie-off actions. Quality: `none` (0), `weak` (< `goodTension` 9), `good` (≥ 9); weak → mistake `summary.traverse_weak`.
+4. **Crossing** (CR-55): a member clips into the перила from a bank (lanyard or friction hitch). Moving while clipped to them = moving **along the span**: `traverseMoveM` 6 m of the straight line between the two anchors per step (× weight factor), converted to path `s` through world x (`sAtWorldX`); weak or no tension (sag) × `sagMoveFactor` 0.5 and, once per member and crossing, `event.traverse_sag` + mistake `summary.traverse_sag` (a score penalty, S§14). No terrain fall roll while clipped to the перила (S§12.1). Only **secured** перила can be crossed.
+5. **Супровід** (CR-56): a move along the перила also needs a separate rope tied to the mover's harness and **held by hand** («Взяти кінець мотузки» `take_end`, node `held`) by a member standing on a bank who is not on the перила — no belay device. The holder can be on either bank. Between crossings a holder on the start bank `haul`s the rope back across; `release` lets go.
+6. **Здьорг** (CR-57): the last participant — every other member already on the finish bank — rigs the retrieval at the поліспаст with a separate carried rope (it becomes part of the crossing and is assumed laid across) or with the супровід rope they are tied into, held on the finish bank. After crossing they untie; a member on the finish bank `retrieve`s: the start anchor comes free and the перила, поліспаст, pull rope and the start base come across (on the ground at the puller). The перила are then untied at the finish base and coiled as usual.
+7. **Completion** (CR-58): S§8.5. Equipment that stays on the obstacle (`itemsLeft`) costs points.
 
 ---
 
 ## 10. Movement ✅ (`actions/movement.ts`)
 
+0. **Along ravine перила** (`traverseReach`, CR-55): replaces the terrain budget for a member clipped (non-hand) to перила — S§9.5.4.
 1. **Terrain budget** (`terrainReach`): budget fraction 1.0 consumed segment by segment: `full = band(angle).moveM × weightFactor × (grabbingKnot ? 0.7 : 1) × surfaceFactor × (uphill ? moveModifiers.uphill : 1)`, where uphill = the segment rises in the move direction (`sign × dir > 0`); crossing a boundary uses `toBoundary / full` of the budget (D-12).
 2. **Weight factor**: total ≤ comfort → 1; ≤ heavy → 0.85; ≤ max → 0.7 (S§17.4).
 3. **Constraints** (`constraintReach`, minimum wins, with reason key):
    1. route ends → `reason.route_end`;
    2. attached to a base → stay within adjacency → `reason.secured_to_base`;
    3. attached to a segment → stay within its span → `reason.segment_end`;
-   4. tied into a rope → used length ≤ rope length (binary search, convex) → `reason.rope_too_short`;
+   4. tied into a rope, or holding a rope end (CR-65) → used length ≤ rope length (binary search, convex) → `reason.rope_too_short`;
    5. Гарда lower belay → distance from belayer ≤ `distanceAtSetM + slackM` → `reason.garda_blocks_feed` (D-19).
 4. `reach = min(terrain, constraints)` rounded down to 0.01 m.
 
@@ -498,7 +536,8 @@ Worn items can never be taken off: there is no «Зняти» action (no taking 
 | Action | Context |
 |---|---|
 | `tie_in` | `TIE_IN_END` |
-| `fix_rope` | base has carabiner → `ANCHOR_CARABINER`; else small tree → `ANCHOR_THIN`; rock outcrop → `ANCHOR_ROCK` (direct knots around rock are one rating step worse than around a tree — prefer the base carabiner); else (large tree) `ANCHOR_THICK` |
+| `fix_rope` | ravine base on a bank tree → `PERILA_FINISH` (finish bank) / `PERILA_START` (start bank, the поліспаст side), whatever the base construction (the перила are tied around the tree, CR-64); else base has carabiner → `ANCHOR_CARABINER`; else small tree → `ANCHOR_THIN`; rock outcrop → `ANCHOR_ROCK` (direct knots around rock are one rating step worse than around a tree — prefer the base carabiner); else (large tree) `ANCHOR_THICK` |
+| `fix_rope` ravine перила, ratings (CR-64) | `PERILA_FINISH`: «Штик навколо товстої опори» correct (preferred), «Штик навколо тонкої опори» correct with the message `knot.msg.prefer_shtyk_tovsta`, Штик / Булінь / Карабінна удавка acceptable; `PERILA_START`: Карабінна удавка correct (releasable — the здьорг), штики and Булінь acceptable; both: every провідник `wrong` with `knot.msg.loop_not_around_tree`, other knots `wrong` |
 | `fix_rope` direct, ratings | `ANCHOR_CARABINER`: Провідник вісімка («8К», figure-eight on a carabiner), Стремено correct; `ANCHOR_THICK` (large tree): Булінь, Зустрічна вісімка (tied around the tree), Штик (товста), Карабінна удавка correct; `ANCHOR_ROCK`: the same knots one step worse |
 | `attach` grabbing | `SELF_BELAY_GRAB` — every knot of category `grabbing` (Прусик, Прусик одним, Австрійський схоплюючий, Бахмана) is rated `correct` (any friction hitch serves as self-belay; diameter / control modifiers still apply) |
 | `belay` knot | `BELAY_LOWER` / `BELAY_UPPER` by mode |
@@ -533,11 +572,11 @@ Input: `knotId, context, control, turns, ropeDiameterMm?, cordDiameterMm?, cordL
 
 ### 12.1 Terrain fall chance (movers only)
 
-`p = base(angle) × surface × Π mistakes × method`, capped at `pFallMax`, where `angle` is the steepest crossed angle and `surface` that of the steepest crossed segment (season- and weather-mapped, S§6.5). Mistakes: winter surface ≥25° without worn crampons; weight band over/max; `uncoordinated` (P1/P2 this step); member on a segment with more than `maxMembersPerSegment`; unwarned-rock threat. Method: hand attachment ×0.5. Members attached to a base do not roll. Members attached with a **grabbing knot (friction hitch) to a fixed-rope segment** do not roll either when the steepest crossed angle is below `safeGrabbingMaxDeg` (55°): movement along a fixed rope on a friction hitch is safe. Roll key `fall:terrain:<m>`. Learning mode emits `event.fall_chance` when the roll misses and mistakes applied.
+`p = base(angle) × surface × Π mistakes × method`, capped at `pFallMax`, where `angle` is the steepest crossed angle and `surface` that of the steepest crossed segment (season- and weather-mapped, S§6.5). Mistakes: winter surface ≥25° without worn crampons; weight band over/max; `uncoordinated` (P1/P2 this step); member on a segment with more than `maxMembersPerSegment`; unwarned-rock threat. Method: hand attachment ×0.5. Members attached to a base do not roll. Members attached with a **grabbing knot (friction hitch) to a fixed-rope segment** do not roll either when the steepest crossed angle is below `safeGrabbingMaxDeg` (55°): movement along a fixed rope on a friction hitch is safe. Members clipped (non-hand) to ravine перила do not roll (they hang on the rope, CR-55). Roll key `fall:terrain:<m>`. Learning mode emits `event.fall_chance` when the roll misses and mistakes applied.
 
 ### 12.2 Fall resolution order (`resolveFall`)
 
-1. Count `falls.total`, emit `event.fall.<cause>` (`terrain`, `knot_failed`, `pulled`).
+1. Count `falls.total`, emit `event.fall.<cause>` (`terrain`, `knot_failed`, `pulled`); the member lets go of every rope end they held (CR-65).
 2. Try every attachment in snapshot ∩ current (non-hand), then every belay as climber. First that holds wins; else unprotected.
 
 ### 12.3 Protection chains
@@ -581,11 +620,11 @@ Slide downhill segment by segment until a segment with angle < 20° or a flat zo
 
 ### 13.1 Commands
 
-`belay_ready, go, stop, take_in, give_slack, secured, fixed_rope_ready, fixed_rope_free, rock, hold, understood` («Зрозумів.» — acknowledges that the recipient heard an instruction; logged, no protocol effect, CR-36). Text is always shown in Ukrainian (`cmd.<key>`), English hint `cmd.<key>.hint`, wrong phrasings `cmd.wrong.<key>.1|2`.
+`belay_ready, go, stop, take_in, give_slack, secured, fixed_rope_ready, fixed_rope_free, rock, hold, understood` («Зрозумів.» — acknowledges that the recipient heard an instruction; logged, no protocol effect, CR-36), `tension` («Тягнемо!» — everybody within 10 m of the поліспаст comes, pulls and the перила are tied off, CR-54, CR-66), `two_hitches` («Два штики!» — from the finish bank: the перила are tied with a штик and hold the tension; required before «Тягнемо!», CR-67). Text is always shown in Ukrainian (`cmd.<key>`), English hint `cmd.<key>.hint`, wrong phrasings `cmd.wrong.<key>.1|2`.
 
 ### 13.2 Protocol state and rules
 
-`ProtocolState = { recent[{step, memberId, command, recipient}] (kept 2 steps), belayReady{belayId: step}, climberGo{belayId: step}, climberSecured{belayId: step}, readySegments{segmentKey: step}, flagged{} }`.
+`ProtocolState = { recent[{step, memberId, command, recipient}] (kept 2 steps), belayReady{belayId: step}, climberGo{belayId: step}, climberSecured{belayId: step}, readySegments{segmentKey: step}, flagged{}, twoHitches?: step of «Два штики!» from the finish bank (CR-67) }`.
 
 | Rule | Trigger | Physical |
 |---|---|---|
@@ -605,11 +644,15 @@ UI-only: the command dialog offers 3 shuffled phrasings (deterministic by step +
 
 ---
 
+### 13.4 Commands at once (CR-72)
+
+In the game a command is **shouted the moment it is chosen** (`engine.shout`): it is validated like a command action and applied immediately through the `command` action with `phase: "commands"` and `step` = the step being planned (`state.step + 1`); `state.step` and `simTimeS` do not change, no other phase runs, it is not a member's step (no active / skipped count). Because it is recorded with the upcoming step number, every protocol rule reads it exactly like a command in that step's plan (P1 / P2, «Сам!» → untie on the following step, «Камінь!» warnings, P7 window, «Два штики!»). Its effects are immediate — «Тягнемо!» walks the team to the поліспаст and tensions the перила at once. Event ids are `<step + 1>:c<n>` so they never clash with the ids of the step itself. Invariants are checked as after a step. Any number of commands may be shouted between two steps. `resolveStep` still accepts commands inside a plan (tests, saves from before CR-72).
+
 ## 14. Statistics ✅ (`stats/stats.ts`)
 
 `StatsCounters`: `steps`; `falls {total, selfBelay, belay, unprotected}`; `injuries[{memberId, causeKey, params}]`; `knots {total, correct, acceptable, wrong, dangerous, missingControl, preTied}`; `commands {issued, violations{P*}}`; `rockfall {total, warned, hits}`; `members{ activeSteps, skippedSteps, forcedSkips, distanceUpM, distanceDownM, falls, knots{rating}, commands, maxWeightKg, overloadedSteps }`; `knotHistory[]`; `mistakes[{step, key, params, ref}]`.
 
-`computeStats` adds `outcome`, `simTimeS` and `itemsLeft`: items not carried/worn whose position is outside the finish zone (a rope counts as left unless all nodes are in the finish zone) (D-32). Active step = an executed non-skip action; skipped = skip or failed action; forced skips counted separately.
+`computeStats` adds `outcome`, `simTimeS` and `itemsLeft`: items not carried/worn whose position is outside the finish zone (a rope counts as left unless all nodes are in the finish zone; поліспаст / здьорг items lie at their base) (D-32), and `penalties` (ravine only, else `null`, CR-58): `{ items: [{ id, type, points }] (lostItemPoints per type), sagCrossings, sagPoints, total, score = max(0, score.base − total), maxScore }`. Active step = an executed non-skip action; skipped = skip or failed action; forced skips counted separately.
 
 ---
 
@@ -617,7 +660,7 @@ UI-only: the command dialog offers 3 shuffled phrasings (deterministic by step +
 
 `checkInvariants(data, state)`:
 1. 9.2.2 item id set equals `itemIds`.
-2. 9.2.1 every location target exists and lists the item (two-way); worn only for wearables; every rope layout's rope is `in_use` in that layout; base/attachment item lists match locations.
+2. 9.2.1 every location target exists and lists the item (two-way); worn only for wearables; every rope layout's rope is `in_use` in that layout; base/attachment/crossing item lists match locations.
 3. 9.2.4 rope used length ≤ length.
 4. 9.2.5 carabiner load ≤ max (S§9.2: ropes in a base carabiner; lanyards not counted, D-23).
 5. 9.5.2.4 no member above `maxKg`.
@@ -638,20 +681,20 @@ UI-only: the command dialog offers 3 shuffled phrasings (deterministic by step +
 
 ### 17.1 `createGame`
 
-Validates (errors throw `ScenarioError`), clones the scenario, places every member at the start-zone base point if the hill has one, otherwise at the middle of the start zone (D-13), creates no bases, creates every member's individual equipment from `individualKit(data, season)` (ids `<type>@<memberId>`, or `<type>@<memberId>#<n>` when the entry count is > 1; configured items of individual types, e.g. from old files, are ignored; the two prusik loops count as pre-tied knots), creates `ItemState`s only for assigned items with `weightKg = defaultWeight(scenario.weights, type, props)` and sets every member's `baseWeightKg = scenario.weights.backpackBaseKg`, creates the RNG, empty protocol and stats, counts pre-tied cord loops as pre-tied knots (no instance, D-29), records initial weights.
+Validates (errors throw `ScenarioError`), clones the scenario, places every member at the start-zone base point if the hill has one, otherwise at the middle of the start zone (D-13), creates no bases, creates every member's individual equipment from `individualKit(data, season)` (ids `<type>@<memberId>`, or `<type>@<memberId>#<n>` when the entry count is > 1; configured items of individual types, e.g. from old files, are ignored; the two prusik loops count as pre-tied knots), creates `ItemState`s only for assigned items with `weightKg = defaultWeight(scenario.weights, type, props)` and sets every member's `baseWeightKg = scenario.weights.backpackBaseKg`, creates the RNG, empty protocol, stats and `crossings: {}`, counts pre-tied cord loops as pre-tied knots (no instance, D-29), records initial weights.
 
 ### 17.2 Validation (`scenario/validate.ts`) — `Issue = { level, key, params }`
 
-1. Hill: section length/angle ranges, total length, configured base points inside the route, tree reference; warning for steep long sections without a base point. The only mandatory base point is **one in the finish zone** (`validate.no_finish_base`, error) — the team must be able to build a base there to finish the route safely. Base points in the start and summit zones are optional (`validate.no_start_base` and `validate.no_summit_base` are removed). A hill with zero intermediate base points is valid.
+1. Hill: section length/angle ranges, total length, configured base points inside the route, tree reference; warning for steep long sections without a base point. A ravine also needs a base spot on the start bank (`validate.no_start_base_ravine`, CR-52). The only mandatory base point is **one in the finish zone** (`validate.no_finish_base`, error) — the team must be able to build a base there to finish the route safely. Base points in the start and summit zones are optional (`validate.no_start_base` and `validate.no_summit_base` are removed). A hill with zero intermediate base points is valid.
 2. Team: size, unique ids, non-empty names. No role checks (`validate.one_leader` / `validate.one_last` are removed).
-3. Equipment: error over `maxKg`, error wearing a non-wearable; warnings: heavy, no locking pear-shaped carabiner (`validate.no_hms`), no rope or rope shorter than the longest section, unassigned items.
+3. Equipment: error over `maxKg`, error wearing a non-wearable; warnings: heavy, no locking pear-shaped carabiner (`validate.no_hms`), no rope or rope shorter than the longest section (ravine: shorter than the path from bank to bank + 4 m), unassigned items.
 
 ### 17.3 Kits (`scenario/kit.ts`)
 
 1. `defaultWeight(weights, type, props)`: rope `lengthM × ropePerMeterKg × (d/10)²` (D-38); cord `lengthM × cordPerMeterKg`; sling by `lengthCm` from `slingKg`; carabiner by `locking`; device by `model`; others the per-type value. Weights are never stored per item in a configuration.
 2. `makeItem(data, id, type, props, assignedTo)` merges catalog defaults (props only).
 3. `memberLoadKg(data, scenario, memberId)` = `backpackBaseKg` + weight of the individual equipment for `scenario.season` + Σ `defaultWeight(scenario.weights, …)` of the member's assigned items (configured individual items are skipped); used by configuration validation and screens.
-4. `buildKit(data, kit, team, season)` — `typical.json` (team gear only — individual equipment is automatic): per member 2 locking pear-shaped carabiners (carried); team: 2 × 50 m 10 mm dynamic ropes spread over the middle members, 4 slings + 4 locking carabiners to the **first member in team order** (`assign: first`). `assign: last` remains available for data.
+4. `buildKit(data, kit, team, season)` — `typical.json` (team gear only — individual equipment is automatic): per member 2 locking pear-shaped carabiners (carried); team: 2 × 55 m (CR-50) 10 mm static (CR-60) ropes spread over the middle members, 4 slings + 4 locking carabiners to the **first member in team order** (`assign: first`). `assign: last` remains available for data.
 
 ### 17.4 Weight
 
@@ -666,9 +709,9 @@ Total = `baseWeightKg` (= `weights.backpackBaseKg`, the same for every member) +
 | Signal | Content |
 |---|---|
 | `route` | `{ name: RouteName, back? }` — `menu, obstacle, hill, season, team, equipment, readiness, game, results, glossary, knots, settings, scenarios, library, hill_editor` |
-| `draft` | `Scenario` being configured (`defaultScenario()`: default preset, 5 members with random distinct sprite rows, typical kit, random seed). Its `weights` is replaced by the current settings wherever it is shown or validated (`withWeights(scenario)`) |
+| `draft` | `Scenario` being configured (`defaultScenario()`: default preset, 5 members with random distinct sprite rows, typical kit with distinct rope colours (`withDistinctRopeColors`, CR-59), random seed). Its `weights` is replaced by the current settings wherever it is shown or validated (`withWeights(scenario)`) |
 | `editingHill` | `HillConfig \| null` — the hill open in the obstacle constructor (never the draft) |
-| `session` | `{ scenario, state, history, plan: Record<memberId, ActionParams> (main action), commands: Record<memberId, ActionParams> (command slot, CR-37), goals: Record<memberId, number> (target `s` of a right-click move, not saved), prevState, lastEvents, startedAt, realTimeMs }` |
+| `session` | `{ scenario, state, history: HistoryEntry[] (steps and shouts, CR-72), plan: Record<memberId, ActionParams> (main action), goals: Record<memberId, number> (target `s` of a right-click move, not saved), prevState, lastEvents, startedAt, realTimeMs }` |
 | `selectedMember`, `animating` | UI/renderer coordination |
 | `lastResult` | `ResultRecord` of the finished game |
 
@@ -676,7 +719,7 @@ Also: `engine` (single instance), `data`, `go(name, back?)`, `updateDraft`, `def
 
 ### 18.2 Controller (`controller.ts`)
 
-`startGame(scenario)` (writes `scenario.weights = settings.weights` before `createGame`, so the saved game and its replay keep the weights it started with), `continueGame()` (dev: replays history and warns on mismatch), `setPlannedAction(m, params|null)` (also clears the member's goal), `planMoveTo(m, s)` (S§19.3.9), `executeStep()` (validates, drops invalid, resolves, stores, re-plans goal moves for the next step, sets `animating` when there are visual events, autosaves, finishes on game end), `giveUp()`, `replaySameScenario()`, `editScenario()` (opens the play flow at the hill choice, S§19.2.3), `savedScenarios/saveScenario/deleteScenario`, `resultsHistory()`, `hasSavedGame()`.
+`startGame(scenario)` (writes `scenario.weights = settings.weights` before `createGame`, so the saved game and its replay keep the weights it started with), `continueGame()` (dev: replays history and warns on mismatch), `setPlannedAction(m, params|null)` (also clears the member's goal; a command is passed to `shoutNow`), `shoutNow(m, params)` (CR-72: `engine.shout`, stores the state, appends `{ shout }` to the history, sets `prevState` / `lastEvents` / `animating` so the shout is animated, autosaves), `planMoveTo(m, s)` (S§19.3.9), `executeStep()` (validates, drops invalid, resolves, stores, re-plans goal moves for the next step, sets `animating` when there are visual events, autosaves, finishes on game end), `giveUp()`, `replaySameScenario()`, `editScenario()` (opens the play flow at the hill choice, S§19.2.3), `savedScenarios/saveScenario/deleteScenario`, `resultsHistory()`, `hasSavedGame()`.
 
 ### 18.3 Persistence (`persistence/storage.ts`)
 
@@ -694,7 +737,7 @@ Records are stored as `{ schemaVersion: 1, data }`; `migrate()` upgrades step by
 
 ### 18.4 Scenario import
 
-`importScenario.ts → validateScenarioJson(x)`: Ajv against `scenario.schema.json`, then `validateScenario` errors. The schema still allows a legacy `member.role` (any of the old values), legacy `member.baseWeightKg`, `item.weightKg`, `props.baseWeightKg` and harness / helmet items; `validateScenarioJson` strips them from the returned scenario and fills `weights` from the current settings (an imported `weights` is ignored: weights come from Settings only).
+`importScenario.ts → validateScenarioJson(x)`: Ajv against `scenario.schema.json` (hill `type` hill | ravine, ravine fields), then `validateScenario` errors. Imported, opened (Scenarios), continued and re-edited configurations pass through `normaliseGear` (`app/gear.ts`): 60 cm slings → 120 cm, every carabiner locking (CR-49, CR-51). The schema still allows a legacy `member.role` (any of the old values), legacy `member.baseWeightKg`, `item.weightKg`, `props.baseWeightKg` and harness / helmet items; `validateScenarioJson` strips them from the returned scenario and fills `weights` from the current settings (an imported `weights` is ignored: weights come from Settings only).
 
 ### 18.5 Settings (`settings.ts`)
 
@@ -702,8 +745,8 @@ Records are stored as `{ schemaVersion: 1, data }`; `migrate()` upgrades step by
 
 ### 18.6 Obstacle library (`app/obstacles.ts`)
 
-1. Obstacles are **predefined before the game**. The library is the list of playable hills: built-in presets (`hillPresets`, read-only, S§6.4) followed by user-made hills from `zgr.v1.obstacles`.
-2. API: `libraryHills(): HillConfig[]` (presets + user hills), `userHills()`, `saveUserHill(hill)` (insert or replace by id), `deleteUserHill(id)`, `isPreset(id)`. The display name is `hillTitle(hill)` in `ui/format.ts` (`nameKey` → `t`, else `name`, else id), because `app` does not depend on `i18n`.
+1. Obstacles are **predefined before the game**. The library is the list of playable obstacles: built-in presets (`obstaclePresets` = hills + ravines, read-only, S§6.4) followed by user-made hills from `zgr.v1.obstacles`. The constructor makes hills only; ravines are presets only (CR-52).
+2. API: `libraryHills(type = "hill"): HillConfig[]` (presets + user hills of that obstacle type), `userHills()`, `saveUserHill(hill)` (insert or replace by id), `deleteUserHill(id)`, `isPreset(id)`. The display name is `hillTitle(hill)` in `ui/format.ts` (`nameKey` → `t`, else `name`, else id), because `app` does not depend on `i18n`.
 3. A user hill must pass `validateHill` without errors to be saved. User hills always have `name` (non-empty) and an id with prefix `hill_`; they never have `nameKey`.
 4. Only hills from the library can be played; the play flow never edits a hill. Deleting a library hill does not affect saved scenarios or results (they hold copies).
 
@@ -720,31 +763,31 @@ Records are stored as `{ schemaVersion: 1, data }`; `migrate()` upgrades step by
 Play flow (`FLOW`): `obstacle → hill → season → team → equipment → readiness`. `FlowNav`: the step list on the left; «Назад» and «Далі» **together on the right** (CR-46). The obstacle constructor is **not** part of the play flow.
 
 1. `MainMenu`: key art, Play («Грати», fresh draft → `obstacle`), Continue (if a save exists), **Obstacle constructor** («Конструктор перешкод» → `library`), Scenarios, Glossary, Knots, Settings.
-2. `ObstacleSelect`: Hill active; rock/ravine/river locked «Незабаром»; disabled "Add to chain". Choosing Hill opens the list of predefined hills.
-3. `HillSelect` (route `hill`): the obstacle library (S§18.6) as cards — title, built-in / «мій» badge, small SVG side-view preview in the draft season, total length, height gain, steepest angle, route type, number of base spots. Clicking a card copies the hill into `draft.route.obstacles[0]` (selected card highlighted); Next is enabled when a hill is selected. A link «Відкрити конструктор» opens `library` (back → `hill`). No hill editing here.
+2. `ObstacleSelect`: Hill and **Ravine** active (CR-52); rock/river locked «Незабаром»; disabled "Add to chain". The card of the draft's obstacle kind is highlighted. Choosing a kind different from the draft's obstacle puts that kind's default preset into the draft; then the list of predefined obstacles of that kind opens.
+3. `HillSelect` (route `hill`): the obstacle library (S§18.6) filtered by the draft's obstacle type, as cards — title, built-in / «мій» badge, small SVG side-view preview in the draft season, total length, height gain (ravine: depth), steepest angle, route type, number of base spots. Title «Вибір схилу» / «Вибір яру»; the constructor link only for hills. Only three hill presets exist (CR-48). Clicking a card copies the hill into `draft.route.obstacles[0]` (selected card highlighted); Next is enabled when a hill is selected. A link «Відкрити конструктор» opens `library` (back → `hill`). No hill editing here.
 4. `ObstacleLibrary` (route `library`): the same list with actions — built-in hill: «Копіювати й змінити» (new user hill `hill_*`, name «<title> (копія)»); user hill: Edit, Duplicate, Delete (confirm); «Новий схил» (copy of the default preset with a new id and name). Edit/new open `hill_editor` with the hill in `editingHill`.
 5. `HillEditor` (route `hill_editor`, the former `HillConfig` editor): name field, route type, section editors (sliders, surface, reorder/add/remove; descent side + summit zone), zone sizes, tree and **base spot** lists, SVG live preview from engine geometry (summer/winter preview toggle, click-to-add tree/base spot), `validateHill` messages, length / height gain / steepest. «Зберегти» (blocked by errors or an empty name) stores the hill with `saveUserHill` and returns to `library`; «Скасувати» discards changes. Built-in presets are never edited in place.
 6. `SeasonMode`: four seasons (весна, літо, осінь, зима), each with its description and «Дощ: n % · Багнюка: n %» from `seasons.json`; mode, optional "refresh typical kit", seed and step limit (advanced). No weights here.
 7. `Team`: size 2–7; per member card: sprite (read-only), name. No base weight input (set in Settings). No role select and no role hint. No appearance picker: a new member gets `randomFreeRow` (a random sprite row 0–6 not used by another member; with ≤ 7 members a free row always exists, so all members always look different and the "same look" warning is removed). «Випадково» stays: it shuffles names and gives every member a new random distinct row. The member number (`#n`, team order) is a badge in the **top-right corner of the card**, not next to / under the sprite.
-8. `Equipment`: the pool lists **groups**, not single items. A group = all items with equal `type` and `props` (key: type + canonical JSON of props). Each group row: icon, label, **count** input (1–50; raising it adds unassigned copies, lowering it removes unassigned copies first, then assigned ones from the last member in team order), per-type property editor (applies to every item of the group; refused with `ui.cfg.eq.err_over_max` if any member would exceed `maxKg`), the per-item weight **read-only** from Settings, distribution line «не взято: n · <member> ×k …», assign select (assigns **one** free item of the group; disabled when none is free), remove-group button. Selecting a group and clicking a member column also assigns one free item (worn if wearable and the member does not wear that type yet). Member columns show only their **carried** items, grouped the same way («Карабін муфт.», «Петля (строп) 120 см»); the «Одягнено» label and worn items are not shown. Carried groups have quantity controls **− n +**: − returns one piece of the group to the pool (unassigned); + gives the member one more piece — a free piece of the group if there is one, otherwise a new copy (the group count grows); + is refused with `ui.cfg.eq.err_over_max` if the member would exceed `maxKg`; the shown quantity always equals the member's pieces of that group. Individual equipment never appears in the pool, the catalog or the member lists (S§4.2); the weight bar still includes it. Catalog: rope, sling, carabiner. Carabiner labels never show the shape («HMS»): «Карабін муфт.» / «Карабін без муфти»; the shape option is labelled «грушоподібний» / «D-подібний» / «овальний». The main rope diameter is fixed at **10 мм** (default in `equipment.json`); the rope editor has no diameter input (length, kind, colour only). Catalog add with count creates/extends a group; «Типовий набір» (learning only). The engine and saved scenarios still hold individual `ItemConfig`s (equipment accountability is unchanged); grouping is presentation only. **Since CR-42:** the «Що беремо» panel is the prepared team stock only — per group: icon, label with characteristics, total count (editable), per-item weight, distribution «не роздано: n · <member> ×k», property editor, remove; **no allocation controls** (no «Видати 1 шт.» select, no select-then-click). Allocation happens in each member's panel: a «+ Взяти…» select lists every stock group with its free count — choosing one gives the member one piece (a free one, else a new copy, like +); the member's groups keep − n +. Carabiner options: locking only — **no shape option** (pear / D / oval); carabiners keep `shape: "hms"` internally (CR-43). Main rope editor: length (20–60 m, step 5) and a labelled «Тип мотузки» select (динамічна / статична), colour; diameter fixed at 10 мм (CR-44).
+8. `Equipment`: the pool lists **groups**, not single items. A group = all items with equal `type` and `props` (key: type + canonical JSON of props). Each group row: icon, label, **count** input (1–50; raising it adds unassigned copies, lowering it removes unassigned copies first, then assigned ones from the last member in team order), per-type property editor (applies to every item of the group; refused with `ui.cfg.eq.err_over_max` if any member would exceed `maxKg`), the per-item weight **read-only** from Settings, distribution line «не взято: n · <member> ×k …», assign select (assigns **one** free item of the group; disabled when none is free), remove-group button. Selecting a group and clicking a member column also assigns one free item (worn if wearable and the member does not wear that type yet). Member columns show only their **carried** items, grouped the same way («Карабін муфт.», «Петля (строп) 120 см»); the «Одягнено» label and worn items are not shown. Carried groups have quantity controls **− n +**: − returns one piece of the group to the pool (unassigned); + gives the member one more piece — a free piece of the group if there is one, otherwise a new copy (the group count grows); + is refused with `ui.cfg.eq.err_over_max` if the member would exceed `maxKg`; the shown quantity always equals the member's pieces of that group. Individual equipment never appears in the pool, the catalog or the member lists (S§4.2); the weight bar still includes it. Catalog: rope, sling, carabiner. Carabiner labels never show the shape («HMS»): «Карабін муфт.» / «Карабін без муфти»; the shape option is labelled «грушоподібний» / «D-подібний» / «овальний». The main rope diameter is fixed at **10 мм** (default in `equipment.json`); the rope editor has no diameter input (length, kind, colour only). Catalog add with count creates/extends a group; «Типовий набір» (learning only). The engine and saved scenarios still hold individual `ItemConfig`s (equipment accountability is unchanged); grouping is presentation only. **Since CR-42:** the «Що беремо» panel is the prepared team stock only — per group: icon, label with characteristics, total count (editable), per-item weight, distribution «не роздано: n · <member> ×k», property editor, remove; **no allocation controls** (no «Видати 1 шт.» select, no select-then-click). Allocation happens in each member's panel: a «+ Взяти…» select lists every stock group with its free count — choosing one gives the member one piece (a free one, else a new copy, like +); the member's groups keep − n +. Carabiners: **no options at all** — every carabiner is locking («Карабін муфт.»); no shape option, `shape: "hms"` internally (CR-43, CR-51). Slings: **120 / 240 cm** only (CR-49). Main rope editor: length (20–60 m, step 5, default **55 m**, CR-50) and a labelled «Тип мотузки» select (динамічна / статична, default **статична**, CR-60), colour; diameter fixed at 10 мм (CR-44). **Rope colours** (CR-59): every newly added rope (catalog add, a raised group count, a member's +, «Типовий набір», the default kit) gets a random colour from `ROPE_COLORS` that no other rope of the configuration has (a random new colour once the palette is used up); ropes with different colours are separate groups.
 9. `Readiness`: summary, issues (learning: warnings + errors; exam: errors), weight distribution + rebalancing tip (learning), save, export JSON, Start (blocked by errors).
 10. `Scenarios`: saved list (open → readiness, export, delete), import JSON.
 
 ### 19.3 Game screen
 
-1. Layout: CSS grid — top bar (hill name, season, weather chip «сухо / багнюка / дощ», mode, Glossary, Knots, Give up with confirm, UA/EN), hill view (`mountHillView`), journal (right), member cards + step controls (bottom).
+1. Layout: CSS grid — top bar (hill name, season, weather chip «сухо / багнюка / дощ», mode, per ravine перила a chip «Перила (поліспаст 1:n): натяг N (якість), закріплено», Glossary, Knots, Give up with confirm, UA/EN), hill view (`mountHillView`), journal (right), member cards + step controls (bottom).
 2. Keyboard: `1–9` select member, `A`/`ф` open the action picker, `Enter` execute step (disabled while animating), `Esc` close dialogs. Canvas-focused keys: arrows pan, `+/−` zoom, `F` follow, `Space` skip animation.
-3. `MemberCards`: portrait (hang/injured/celebrate sheets by status), number + name, status **only when not fine** (no «у нормі»: shown for `fallen_caught`, `injured`, `finished`, CR-41), `s` / zone / angle, attachments, tie-ins, belays, **team gear only as icons** — one `ItemIcon` per group of equal items with «×N» when N > 1, tooltip = item name — plus one «Особисте спорядження» icon whose tooltip lists the member's individual set (CR-40), weight bar, planned action label, planned command line («Команда «…»» with ✕), invalid reason, learning hints.
+3. `MemberCards`: portrait (hang/injured/celebrate sheets by status), number + name, status **only when not fine** (no «у нормі»: shown for `fallen_caught`, `injured`, `finished`, CR-41), `s` / zone / angle, attachments, tie-ins, belays, **team gear only as icons** — one `ItemIcon` per group of equal items with «×N» when N > 1, tooltip = item name — plus one «Особисте спорядження» icon whose tooltip lists the member's individual set (CR-40), weight bar, planned action label, no planned-command line (commands are shouted at once, CR-72), invalid reason, learning hints.
 4. `Journal`: `state.log` grouped by step (newest first), severity styles, `formatEvent`; exam mode hides hint-level entries and fall chances.
 5. `ActionPicker`: stages `list → knot | command | items → confirm (learning hints) → setPlannedAction`. Movement is not in the picker: members move only by a right-click on the hill (S§19.3.9). The items group has no drop. Disabled options show their reason text.
 6. `KnotDialog`: all 24 knots grouped by category as **text tiles**; **no control-knot selector** — the chosen knot always gets its control knots tied correctly (`control = controlKnotsRequired > 0 ? "double" : "none"`, `controlFor(def)` in `knots/evaluate.ts`); turns (only with `minTurns`); "via locking carabiner" for tie-in; learning mode shows live `evaluateKnot` rating, failure %, messages and description; exam mode shows none. «Скасувати» and «Зав'язати» sit in a **fixed footer** (`position: sticky; bottom: 0` inside the scrolling modal) that also shows the rating badge of the chosen knot («правильний» / «прийнятний» / «неправильний» / «небезпечний», learning mode only — exam mode shows none), so they stay visible while the knot list scrolls (CR-45).
-7. `CommandDialog`: Ukrainian text always, English hint in EN; recipient; phrase-choice mode. «Страховка готова!» is offered only to a member who is the belayer of a belay that **already exists** (set up in an earlier step), never while the belay is being set up (CR-34). A chosen command goes to the member's command slot; it does not replace the planned action (CR-37).
-8. Step controls: step number, simulated time (`hh:mm:ss`), planned step duration, «Виконати крок».
-11. **Hover command button** (CR-35): when the pointer is over a member sprite (the hand cursor already shows it is clickable), a small speech-bubble button appears above the member's label; clicking it selects the member and opens the `CommandDialog` for them (store signal `commandDialogFor`). It hides 0.6 s after the pointer leaves both the member and the button, during animations and when the game is over.
+7. `CommandDialog`: Ukrainian text always, English hint in EN; the recipient select comes first; **a click on a command shouts it at once** — there is no «Крикнути» button, only «Скасувати» (CR-69); in phrase-choice mode the click on a command shows its phrasings and the click on a phrasing shouts it. «Страховка готова!» is offered only to a member who is the belayer of a belay that **already exists** (set up in an earlier step), never while the belay is being set up (CR-34). A chosen command is **shouted at once** (`shoutNow`, CR-72): the speech bubble and its effects show right away, the step does not advance, the planned action stays.
+8. Step controls: step number, simulated time (`hh:mm:ss`), planned step duration, «Виконати крок»; on a ravine with the whole team on the finish bank also «Завершити рівень» (`finishLevel`, CR-58). Member cards show «на перилах» instead of the zone for a member hanging on ravine перила.
+11. **Hover icons** (CR-35, CR-62): when the pointer is over a member sprite (the hand cursor already shows it is clickable), two separate 16×16 icons appear above the member's label: **«Подача команди»** (speech bubble with «!») — opens the `CommandDialog` (store signal `commandDialogFor`) — and, when the member has at least one rope action (`isRopeAction`, `actions/options.ts`, incl. self-belay and belay, CR-70), a **rope icon** — opens the `ActionPicker` with only the rope actions (`ropeOnly`, title «Мотузка: <name>», store signal `ropePickerFor`): rope work, self-belay, belay and **creating / dismantling a base** (`isRopeAction`, CR-71), shown as a **grid of tiles** grouped like the list (`.action-tiles`, like the knot tiles; disabled tiles show the reason in red, CR-71). The rope icon is schematic and shows the kind of the member's rope (tied in / held / carried, else the first rope they can act on — for a belay the climber's rope —, else any rope in play): **static** — a straight blue rope with even braid ticks, **dynamic** — a red zigzag (`bridge.ropeIconFor`). The icon under the pointer is highlighted (yellow frame, `_hl` texture). Each icon's hitbox is exactly its image (explicit 16×16 hit area, whole-pixel positions); without a rope icon the command icon sits in the middle. Both select the member, and hide 0.6 s after the pointer leaves the member and the icons, during animations and when the game is over.
 9. **Right-click move**: a right-click on a point of the hill view sends the **selected** member to that point (`planMoveTo(m, s)`):
    1. Ignored while animating, when the game is over, or for injured / finished members. `s` is clamped to the route; a click within 0.05 m of the member clears their goal.
    2. Sets `goals[m] = s` and plans `{ kind: "move", toward, distanceM: |s − pos|, targetS: s }`. The engine moves `min(distanceM, reach)` (S§9.2), so a far point takes several steps.
-   3. After each step the controller re-plans the move toward the goal for the next step while the member is `ok`, the step brought them closer and they are not yet within 0.05 m; otherwise the goal is cleared. Choosing any other action for the member (picker, skip, Esc) clears the goal.
+   3. After each step the controller (`nextGoals`) re-plans the move toward the goal for the next step while the member is `ok`, the step brought them closer and they are not yet within 0.05 m; a member who **stumbled or fell without injury** this step (a `fall.start` event, status `ok` or `fallen_caught`) keeps the goal and walks on next step even if the fall set them back (CR-63); otherwise the goal is cleared. Choosing any other action for the member (picker, skip, Esc) clears the goal.
    4. The member card shows «Іти до {s} м»; the planned move is validated like any action (invalid reason / learning hints on the card).
 10. **Station icon** (left-click): a left-click (no drag) on a base spot **or on its support** — the tree (within half the tree's width: small 1 m, large 1.7 m) or rock outcrop (1.5 m), not only the spot marker (CR-38) — when the selected member is adjacent to it, shows a station icon **with a short text label** above the spot (`bridge.stationAt(basePointId)` → `{ label, enabled, reason?, plan }`):
     1. Spot without a base → label «Організувати базу»; plans `make_base` on a **sling + locking carabiner by default** (bolt on bolts). If the member lacks the sling or the carabiner, a warning dialog «Немає петлі / муфтованого карабіна — базу буде організовано без петлі (мотузку в'язати прямо до опори)» asks «Все одно організувати» / «Скасувати»; confirming plans the direct base (CR-39). The action picker shows the same warning before a direct base is planned.
@@ -753,10 +796,10 @@ Play flow (`FLOW`): `obstacle → hill → season → team → equipment → rea
 
 ### 19.4 Results and references
 
-1. `Results`: outcome banner; team totals; per-member table; learning summary (`stats.mistakes`) with links to knot reference / glossary; knot history with ratings (revealed here in exam mode); previous attempts of the same scenario; Replay, Edit, Menu, Export JSON.
+1. `Results`: outcome banner (`completed` in amber); team totals; per-member table; learning summary (`stats.mistakes`) with links to knot reference / glossary; knot history with ratings (revealed here in exam mode); previous attempts of the same scenario; ravine **score** panel: «Разом N / 100», one line per lost item with its points, sagging-перила crossings (CR-58); Replay, Edit, Menu, Export JSON.
 2. `Glossary`: all `term.*` with Ukrainian, English and meaning, plus the command list.
 3. `KnotReference`: every knot (name, EN reference, category, control knots, turns, requirements, description, ratings per context).
-4. `Settings`: language, term hints, phrase choice, pixel scale, animation speed, sound, and **Weights**: base backpack weight and one input per standard equipment weight (S§18.5), with «Скинути до стандартних» (reset to `gameData.weights`). Changes apply to the next started game; a game in progress keeps the weights it started with.
+4. `Settings`: language, term hints, phrase choice, pixel scale, animation speed, sound, and **Weights**: base backpack weight and one input per standard equipment weight (S§18.5; slings 120 / 240 cm and the locking carabiner only, CR-49, CR-51), with «Скинути до стандартних» (reset to `gameData.weights`). Changes apply to the next started game; a game in progress keeps the weights it started with.
 
 ### 19.5 Text helpers (`format.ts`, `dialogs/labels.ts`)
 
@@ -767,12 +810,12 @@ Play flow (`FLOW`): `obstacle → hill → season → team → equipment → rea
 ## 20. Rendering ✅ (`src/game`)
 
 1. **Mount**: `mountHillView(container)` creates a Phaser game after fonts load; `input.keyboard` disabled (keys handled on the focused canvas). Integer zoom = `settings.pixelScale` or the largest zoom that still shows ≥ 400×200 logical px; the logical size is `container / zoom` (adaptive, recomputed by a `ResizeObserver`). Overlay DOM buttons: 1×, 2×, follow, skip. The browser context menu is disabled on the canvas; a **right-click** on the hill calls `bridge.moveTo(s)` with `s = world.sAtX(pointer.worldX)` (binary search, x is monotonic in s). Goal points are drawn as a small yellow cross with the member number. Effects on `session`, `selectedMember`, `settings`, `locale` call `hill.refresh()`. Unmount disposes everything and sets `animating=false`.
-2. **Scenes**: `BackgroundScene` (sky gradient with dithering, generated far/mid/near mountain layers with scroll factors 0.1/0.3/0.6 — the parallax follows the camera **in the same frame** (`bg.follow(camera)` from `HillScene.update`), layer textures are keyed by season, weather **and view height** and are `PARALLAX_PAD` (64 px) taller than the view so a vertical shift never shows a gap; the vertical shift is clamped to the pad (CR-32), one palette per season (spring: fresh light blue sky and light green hills; summer: deep blue sky, sun and clouds; autumn: warm hazy sky, ochre / rust hills; winter: pale sky and snowfall); weather `rain` switches to a grey sky without sun and adds falling rain streaks; `mud` has no sky change, `VIEW_W/VIEW_H` live-bound to the adaptive size) and `HillScene` (world, camera, members, ropes, timeline).
+2. **Scenes**: `BackgroundScene` (ravine, CR-52: the painted panorama `art_ravine_bg` scaled to cover the view, tinted per season — spring light green, autumn warm, winter pale — and darkened in rain, with a slow parallax; rain / snow particles as for hills; hills:) (sky gradient with dithering, generated far/mid/near mountain layers with scroll factors 0.1/0.3/0.6 — the parallax follows the camera **in the same frame** (`bg.follow(camera)` from `HillScene.update`), layer textures are keyed by season, weather **and view height** and are `PARALLAX_PAD` (64 px) taller than the view so a vertical shift never shows a gap; the vertical shift is clamped to the pad (CR-32), one palette per season (spring: fresh light blue sky and light green hills; summer: deep blue sky, sun and clouds; autumn: warm hazy sky, ochre / rust hills; winter: pale sky and snowfall); weather `rain` switches to a grey sky without sun and adds falling rain streaks; `mud` has no sky change, `VIEW_W/VIEW_H` live-bound to the adaptive size) and `HillScene` (world, camera, members, ropes, timeline).
 3. **World mapping** (`render/world.ts`): 12 px per metre; margins 160 px sides, 170 px top, 90 px bottom; harness at feet −12 px, hands −14 px; world y down.
 4. **Terrain** (`render/terrain.ts`): per geometry segment a masked `TileSprite` fill (128×128 textures) and a rotated edge strip (128×32), flat zones extended; winter: snow drawn flat with dithering, icy rock / snowy scree tinted with a snow band; `mud` = ground texture tinted brown with darker puddle dots, `wet_rock` = rock texture tinted blue-grey. Season tint on grass and trees: spring — flowers (white / pink / yellow pixels) along grass edges and a light green tree tint; autumn — ochre grass tint and orange / rust deciduous trees. Previews (`HillEditor`, `HillSelect`) use the same season / surface colours. Trees, rock outcrops, bolts, base point markers, start/summit/finish flags.
-5. **Dynamic** (`render/dynamic.ts`): bases (sling + carabiner + flag), dropped items, ropes redrawn every frame through node chains (fixed segments taut, others sagging, free ends coiled; colour from `props.color`), self-belay lines.
+5. **Dynamic** (`render/dynamic.ts`): bases (sling + carabiner + flag), dropped items, ropes redrawn every frame through node chains (fixed segments taut, others sagging, free ends coiled; colour from `props.color`), self-belay lines. Held rope ends (супровід, «Взяти кінець мотузки») follow the holder's hands. The перила sag shown eases toward the sag of the current tension (time constant 350 ms, `easeSag`): after «Тягнемо!» the rope visibly takes in slack until it looks taut (CR-68); members walking up to the поліспаст are animated like moves. Ravine перила (CR-55, CR-70) are drawn between the two anchors: unloaded as a curve whose mid-span sag is a share of the span by tension quality (`none` 0.3, `weak` 0.1, `good` 0 — **well tensioned перила are a straight line**); with people on them as straight pieces from anchor to each person to anchor. Under a person's weight weak перила go down `2 + 4 × (1 − tension / goodTension)` m (no tension: 6 m) × 4t(1−t) along the span (0 at the anchors, most mid-span); good tension: no dip. `hangPoint` places a member clipped to them over the gap **lying horizontally, face up** under the rope (sprite turned −90° around the feet, head toward the start bank; harness 4 px below the rope point, a short vertical lanyard line); label and selection marker follow the lying body (`members.lying(id)`).
 6. **Members** (`render/members.ts`): sprite row = `appearance.row`; sheets `team_shout 4, tie_knot 6, belay 4, celebrate 6, fall 4, slide 3, hang 3, injured 2` at 32×32, pivot (16,31); idle = `team_shout` frame 0 (no idle/walk art); members at the same spot spread 1.25 m apart; number labels (full name when selected), pointer + ring for the selected member, planned-action icon; walk = 1 px bob, lean on ≥25°. **Idle stroll** (cosmetic, D-65): a member who is `ok`, has no planned action, is not tied in, attached or belaying, and stands in a safe zone (start / summit / finish) now and then walks 0.3–1 m sideways or back (or returns) at 0.35 m/s with the walk bob, staying inside the same zone and at least 0.7 m from teammates; each member waits 8–15 s (random) between strolls and only one member strolls at a time. It is a display offset only (state, journal and replay unchanged) and resets immediately when the member gets a task, a new step is animated or the member stops being idle.
-7. **Animation** (`anim/timeline.ts`): three phases per step — (1) moves, action poses (knot/base/attach/item → tie_knot, belay → belay, commands → shout + speech bubble with Ukrainian text and English line in EN); (2) falls (fall → slide tween → hang / injured / idle), falling stones, red flash on rock hits; (3) celebrate on win. Timing ÷ `animationSpeed`. Skip jumps to the final state. `setAnimating(false)` when done.
+7. **Animation** (`anim/timeline.ts`): a command shouted at once (CR-72) is animated like a step (same step number, new events): speech bubble, members walking to the поліспаст. Three phases per step — (1) moves, action poses (knot/base/attach/item → tie_knot, belay → belay, commands → shout + speech bubble with Ukrainian text and English line in EN); (2) falls (fall → slide tween → hang / injured / idle), falling stones, red flash on rock hits; (3) celebrate on win. Timing ÷ `animationSpeed`. Skip jumps to the final state. `setAnimating(false)` when done.
 8. **Assets** (`assets.ts`): `manifest` from `assets/manifest.json`, `assetUrl(id)` via `import.meta.glob`; missing art → `render/textures.ts` placeholders with the contract sizes.
 
 ---
@@ -782,7 +825,7 @@ Play flow (`FLOW`): `obstacle → hill → season → team → equipment → rea
 1. Flat keys in `locales/<uk|en>/<area>.json`, merged by `import.meta.glob`. Areas: `common`, `engine` (owned by the engine: events, reasons, hints, knots, terms, items, commands, rules, validation, enums), `config` (`ui.cfg.*`), `game` (`ui.game.*`, `ui.res.*`, `ui.ref.*`, `ui.set.*`, `group.*`), `view` (`ui.view.*`).
 2. `t(key, params)` (active locale, subscribes components), `tl(locale, key, params)`, `tUk`. Missing keys render `⟦key⟧` in dev.
 3. ICU MessageFormat; Ukrainian plurals `one/few/many/other`.
-4. Engine key namespaces: `event.*`, `reason.*`, `hint.*`, `knot.<id>.name|description`, `knot.msg.*`, `knot.rating.*`, `rating.*`, `context.*`, `category.*`, `control.*`, `cmd.*`, `rule.P*`, `summary.*`, `injury.*`, `factor.*`, `chain.*`, `anchor.*`, `action.*` (option labels), `actionkind.*`, `validate.*`, `term.*` (+ `.meaning`), `item.*`, `status.*`, `zone.*`, `outcome.*`, `method.*`, `season.*`, `mode.*`, `surface.*`, `route.*`, `anchorType.*`, `treeSize.*`, `preset.hill.*`, `kit.*`.
+4. Engine key namespaces: `event.*`, `reason.*`, `hint.*`, `knot.<id>.name|description`, `knot.msg.*`, `knot.rating.*`, `rating.*`, `context.*`, `category.*`, `control.*`, `cmd.*`, `rule.P*`, `summary.*`, `injury.*`, `factor.*`, `chain.*`, `anchor.*`, `action.*` (option labels), `actionkind.*`, `validate.*`, `term.*` (+ `.meaning`), `item.*`, `status.*`, `zone.*`, `outcome.*`, `method.*`, `season.*`, `mode.*`, `surface.*`, `route.*`, `anchorType.*`, `treeSize.*`, `preset.hill.*`, `preset.ravine.*`, `tension.*` (`none|weak|good`), `kit.*`.
 5. Ukrainian phrasing keeps member names in the nominative («{member}: …»), because names are not declined.
 6. Default member names are Ukrainian in both locales: Саша, Рома, Єгор, Надя, Владік, Ксеня, Денис, Марго, Андрій, Світлана, Міша, Богдан (`DEFAULT_NAMES` in `app/store.ts`; «Випадково» picks from them).
 
@@ -793,7 +836,7 @@ Play flow (`FLOW`): `obstacle → hill → season → team → equipment → rea
 1. Input `assets/raw/<group>/<id>.(jpg|png)` with `#00FF00` chroma; output `assets/<group>/<id>.png` + `assets/manifest.json`.
 2. Steps: chroma key with tolerance + despill → strict 0/255 alpha → block-majority downscale (not point sampling) → per-type layout.
 3. Team sheets: connected components → 7 rows by vertical gaps → frames sorted by x → uniform per-sheet scale (standing figure ≈ 30 px) → 32×32 cells, feet on row 31, centred. Known source defects patched in code (celebrate row lengths, slide row 1 frame 2).
-4. Terrain: fills 128×128 opaque, edges 128×32; trees fitted to 24×40 / 40×72; key art 480×270.
+4. Terrain: fills 128×128 opaque, edges 128×32; trees fitted to 24×40 / 40×72; key art 480×270; ravine background `art_ravine_bg` 640×360 from `assets/raw/art/Піксельна панорама гірської долини.png` (centre crop 16:9, block downscale, CR-52).
 5. Manifest entry: `{ file, width, height, frameWidth?, frameHeight?, frames?, rows? }`. Contract: `docs/ASSET_SPEC.md`.
 
 ---
@@ -803,11 +846,11 @@ Play flow (`FLOW`): `obstacle → hill → season → team → equipment → rea
 | Level | Location | What |
 |---|---|---|
 | Scenario DSL | `tests/engine/dsl.ts` | `Game` wrapper (validates plans, records per-step roll scripts, `replay()`), `scenario()`, `team()`, `preset()`, `flatHill()`, `steepHill()`, `K()` knot choice, `mv()`, `say()`, `CALM` script (no random falls / rocks) |
-| Scenario | `tests/engine/scenarios/` | M1 walk-up; §24.2.1 golden path + .10 determinism; §24.2.2–.9, .11–.14 |
+| Scenario | `tests/engine/scenarios/` | M1 walk-up; §24.2.1 golden path + .10 determinism; §24.2.2–.9, .11–.14; `ravine.test.ts` (CR-52 … CR-68: belayed first crossing with a second rope, перила knots per bank, «Два штики!» then one «Тягнемо!» (pullers within 5 m walk up, tension by pullers × ratio, tied off), «Взяти кінець мотузки», secured перила + супровід, haul, здьорг by the last, victory with everything back, `completed` with penalties, replay) |
 | Unit | `tests/engine/unit/invariants.test.ts`, `config.test.ts` | one test per §9.2 rule + random play; base-spot validation, no pre-built bases, no roles, kit by team order, legacy `role` import |
 | Data | `tests/data/data.test.ts` | contexts → knots, probabilities in [0,1], presets valid, kits build, texts for every knot/term/item/command/context/rule/preset, uk/en key parity, ICU parse, every key literal in `src` exists |
-| App | `tests/app/goals.test.ts` | right-click goal: multi-step walk, goal cleared by another action |
-| E2E | `tests/e2e/smoke.spec.ts` | Play → Hill → pick the default predefined hill → defaults → start, right-click on the hill plans «Іти до …», play steps, switch to EN; obstacle constructor: copy a preset, rename, save, the copy appears in the hill list; glossary and knots screens |
+| App | `tests/app/goals.test.ts`, `tests/app/gear.test.ts` | right-click goal: multi-step walk, goal cleared by another action, goal kept after an uninjured fall (CR-63); distinct rope colours, legacy gear normalisation (CR-49, CR-51, CR-59) |
+| E2E | `tests/e2e/smoke.spec.ts` | Play → Hill → only the three hills listed → «Скельно-осипний схил» → defaults → start, right-click on the hill plans «Іти до …», play steps, switch to EN; obstacle constructor: copy a preset, rename, save, the copy appears in the hill list; ravine: Play → Яр → «Скельний яр», no 60 cm sling / locking checkbox, 55 m ropes, start, one step; glossary and knots screens |
 | Headless | `npm run sim -- scenario.json history.json [uk\|en]` | prints the journal |
 
 Rules for new work: every new rule gets a scenario or unit test using forced rolls (`RollScript`) instead of searching seeds; tests must not depend on unscripted randomness unless they only assert invariants.
@@ -831,6 +874,8 @@ Data only: `knots.json` + `contexts.json` + `knot.<id>.name|description` in both
 
 ### 24.3 New obstacle type (post-MVP, PRD §25)
 
+The ravine (CR-52) took a shortcut: it reuses the 1D path geometry (`type: "ravine"`, `routeType: "descent_ascent"`) and adds the gap-spanning перила on top (S§9.5). A truly different shape (vertical rock, river) still follows the steps below.
+
 1. Add a config type to the `Obstacle` union and `geometry/<type>.ts` exposing the same queries (`segmentAt`, `toWorld`, `zoneAt`, `downhillDir`).
 2. Dispatch geometry by `obstacle.type`; positions already carry `obstacleIndex`.
 3. New surfaces / hazards in data, new actions per S§24.1, a renderer for the type, a constructor editor and a selection list in the obstacle library (S§18.6), presets, tests.
@@ -851,7 +896,7 @@ Raw file in `assets/raw/<group>/<id>`, extend the pipeline if it is a new layout
 |---|---|---|
 | §22.1 | Desktop ≥1280×720, mouse + keyboard | ✅ |
 | §22.2 | `resolveStep` < 50 ms for 7 members | 🟡 not benchmarked (golden path: ~200 steps in < 1 s) |
-| §22.3 | Initial load < 5 MB | ✅ JS 1.7 MB (0.49 MB gzip) + art < 1 MB |
+| §22.3 | Initial load < 5 MB | ✅ JS 1.8 MB (0.51 MB gzip) + art ≈ 1.7 MB (ravine panorama 0.65 MB) |
 | §22.4 | Deterministic replay | ✅ tested |
 | §22.5 | Keyboard access, contrast, names/numbers on members | ✅ |
 | §22.6 | No network after load | ✅ fonts bundled |
@@ -868,6 +913,7 @@ Raw file in `assets/raw/<group>/<id>`, extend the pipeline if it is a new layout
 6. Palette snapping in the asset pipeline (A-A-4).
 7. Property-based tests with fast-check (I-ENG-3); bundle code-splitting (I-ENG-1).
 8. PRD owner rulings pending: `docs/CTA/ACTIONS.md` A-R-1 … A-R-10.
+9. Ravine (CR-52 … CR-58): no ravine constructor (presets only); the супровід is control, not fall protection (an anchor failure on the перила is resolved like any fall); a separate здьорг rope is assumed laid across, not drawn; the bank-to-bank rope length follows the ground path (S§4.5), not the span (D-76 … D-80).
 
 ---
 
@@ -923,3 +969,28 @@ Raw file in `assets/raw/<group>/<id>`, extend the pipeline if it is a new layout
 | CR-45 | 2026-10-22 | Knot dialog: fixed footer with «Скасувати», «Зав'язати» and the rating | S§19.3 | Implemented 2026-10-22 |
 | CR-46 | 2026-10-22 | Setup screens: «Назад» and «Далі» together on the right | S§19.2 | Implemented 2026-10-22 |
 | CR-47 | 2026-10-22 | Belay without self-belay: «від бази» (base next to the belayer) and «від себе» (own harness); replaces the self-secure requirement of CR-26 and the base-only menu of CR-33 | S§9.2, S§9.3, S§12.3 | Implemented 2026-10-22 |
+| CR-48 | 2026-10-24 | Hill selection offers only «Скельно-осипний схил», «Через вершину», «Осінній Лист 2026 2.2»; the other three presets become test fixtures | S§2, S§3, S§6.3, S§6.4, S§19.2, S§23 | Implemented 2026-10-24 |
+| CR-49 | 2026-10-24 | Slings 120 / 240 cm only (no 60 cm) in equipment and Settings; old configurations normalised | S§4.2, S§18.4, S§19.2, S§19.4 | Implemented 2026-10-24 |
+| CR-50 | 2026-10-24 | Main rope default length 55 m (catalog and typical kit) | S§6.3, S§17.3, S§19.2 | Implemented 2026-10-24 |
+| CR-51 | 2026-10-24 | No locking / non-locking choice: every carabiner is locking; old configurations normalised | S§4.2, S§18.4, S§19.2, S§19.4 | Implemented 2026-10-24 |
+| CR-52 | 2026-10-24 | New playable obstacle type «яр» (ravine): geometry descent–bottom–ascent, preset «Скельний яр», selection screens, panorama background | S§3, S§4.2, S§5, S§6, S§17.2, S§18.6, S§19.2, S§20, S§22, S§24.3 | Implemented 2026-10-24 |
+| CR-53 | 2026-10-24 | Ravine: one member on belay descends one side and climbs the other, taking a second rope tied to the harness; перила fixed bank to bank | S§9.5 | Implemented 2026-10-24 |
+| CR-54 | 2026-10-24 | Поліспаст 3:1 at the start-bank anchor; pulls count only together with the command «Тягнемо!»; more pullers → more tension | S§4, S§6.3, S§8.1, S§9.2, S§9.5, S§13.1 | Implemented 2026-10-24 |
+| CR-55 | 2026-10-24 | Tension must be tied off at the tree in the same step; crossing only on secured перила, moving along the span; weak tension → sag: slower and a penalty | S§9.2, S§9.5, S§10, S§12.1, S§20 | Implemented 2026-10-24 |
+| CR-56 | 2026-10-24 | Супровід: a separate rope on the crosser's harness held by hand from a bank (no belay device) is required on the перила; haul / release | S§4.5, S§9.2, S§9.5 | Implemented 2026-10-24 |
+| CR-57 | 2026-10-24 | Система здьоргу by the last participant (separate rope or супровід); after crossing the перила are released from the finish bank | S§9.2, S§9.5, S§15 | Implemented 2026-10-24 |
+| CR-58 | 2026-10-24 | Ravine completion: all on the finish bank; all gear back → victory, else «Завершити рівень» → completed with penalties (score) | S§4.3, S§7, S§8.5, S§14, S§19.3, S§19.4 | Implemented 2026-10-24 |
+| CR-59 | 2026-10-24 | New ropes get a random colour not used by another rope | S§18.1, S§19.2 | Implemented 2026-10-24 |
+| CR-60 | 2026-10-24 | Main rope default type static (catalog and typical kit); the static / dynamic choice stays | S§6.3, S§17.3, S§19.2 | Implemented 2026-10-24 |
+| CR-61 | 2026-10-24 | «Зібрати поліспаст»: ratio selectable 1:2 / 1:3 / 1:4, applied to the tension per puller; still required before crossing | S§4.6, S§6.3, S§9.2, S§9.3, S§9.5, S§19.3 | Implemented 2026-10-24 |
+| CR-62 | 2026-10-24 | Hover icons over a member: «Подача команди» and a schematic static / dynamic rope icon (rope actions only), highlighted on hover, hitbox = image | S§9.3, S§19.3 | Implemented 2026-10-24 |
+| CR-63 | 2026-10-24 | A member who stumbled or fell without injury on the way to a right-click goal walks on toward it next step | S§19.3 | Implemented 2026-10-24 |
+| CR-64 | 2026-10-24 | Перила around bank trees: штики correct on the finish bank (thick preferred), карабінна удавка on the start bank, провідники unsuitable | S§6.3, S§11.2 | Implemented 2026-10-24 |
+| CR-65 | 2026-10-24 | «Взяти кінець мотузки»: take a free end of a laid-out rope without a knot and walk with it | S§4.5, S§9.2, S§9.5, S§10, S§12.2 | Implemented 2026-10-24 |
+| CR-66 | 2026-10-24 | «Тягнемо!» once: everybody within 5 m walks to the поліспаст and pulls | S§6.3, S§8.1, S§9.5, S§13.1 | Implemented 2026-10-24 |
+| CR-67 | 2026-10-24 | «Два штики!» from the finish bank is required before tensioning | S§4.3, S§9.5, S§13.1 | Implemented 2026-10-24 |
+| CR-68 | 2026-10-24 | Tensioning is one action (no separate pull / tie-off actions); the rope animates taking in slack until taut | S§8.1, S§9.2, S§9.5, S§20 | Implemented 2026-10-24 |
+| CR-69 | 2026-10-24 | Command dialog: no «Крикнути» button — clicking a command (or, in phrase practice, a phrasing) shouts it | S§19.3 | Implemented 2026-10-24 |
+| CR-70 | 2026-10-24 | Rope icon also lists self-belay and belay; «Тягнемо!» reaches 10 m; well-tensioned перила straight, weak ones dip a few metres under a person; a person on the перила lies horizontally, face up | S§6.3, S§9.3, S§9.5, S§13.1, S§19.3, S§20 | Implemented 2026-10-24 |
+| CR-71 | 2026-10-24 | Rope quick actions also create / dismantle a base and are shown as a grid of tiles like the knots | S§9.3, S§19.3 | Implemented 2026-10-24 |
+| CR-72 | 2026-10-24 | Commands are shouted at once on click (no step, no time, no command slot); history holds steps and shouts | S§7, S§13.4, S§18.1, S§18.2, S§19.3, S§20 | Implemented 2026-10-24 |

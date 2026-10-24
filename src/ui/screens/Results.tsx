@@ -106,6 +106,17 @@ export function ResultsScreen() {
             <h2>{t("ui.res.items_left")}</h2>
             {st.itemsLeft.length === 0 ? <p class="muted">{t("ui.res.nothing_left")}</p> : st.itemsLeft.map((i) => <p>{t(`item.${i.type}`)} — {t("ui.m", { m: i.s })}</p>)}
           </section>
+          {st.penalties && (
+            <section class="panel">
+              <h2>{t("ui.res.score")}</h2>
+              <Kv k={t("ui.res.score_total")} v={`${st.penalties.score} / ${st.penalties.maxScore}`} />
+              {st.penalties.items.map((i) => (
+                <Kv k={t("ui.res.penalty_lost", { item: t(`item.${i.type}`) })} v={`−${i.points}`} />
+              ))}
+              {st.penalties.sagCrossings > 0 && <Kv k={t("ui.res.penalty_sag", { count: st.penalties.sagCrossings })} v={`−${st.penalties.sagPoints}`} />}
+              {st.penalties.total === 0 && <p class="muted">{t("ui.res.no_penalties")}</p>}
+            </section>
+          )}
         </div>
 
         <section class="panel">

@@ -23,7 +23,6 @@ export function CommandDialog({ memberId, onConfirm, onCancel }: { memberId: str
   const s = session.value!;
   const [command, setCommand] = useState<CommandKey | null>(null);
   const [recipient, setRecipient] = useState<string>("all");
-  const [phrase, setPhrase] = useState<string | null>(null);
   const practice = settings.value.phraseChoice;
   const def = command ? data.commands.find((c) => c.key === command)! : null;
   // «Страховка готова!» only once this member's belay exists — never while it is being set up (CR-34)
@@ -31,33 +30,17 @@ export function CommandDialog({ memberId, onConfirm, onCancel }: { memberId: str
   const memberIdx = s.scenario.team.findIndex((m) => m.id === memberId);
   const phrases = def ? shuffle([def.textKey, ...def.wrongKeys], s.state.step * 31 + memberIdx * 7 + data.commands.indexOf(def)) : [];
 
-  const confirm = () => {
-    if (!command) return;
-    const misunderstood = practice && phrase !== null && phrase !== def!.textKey;
-    onConfirm({ kind: "command", command, recipient, ...(misunderstood ? { misunderstood: true } : {}) });
+  /** A click on a command shouts it at once (CR-69); in phrase practice the click on a phrase does. */
+  const shout = (key: CommandKey, chosen: string | null = null) => {
+    const d = data.commands.find((c) => c.key === key)!;
+    const misunderstood = practice && chosen !== null && chosen !== d.textKey;
+    onConfirm({ kind: "command", command: key, recipient, ...(misunderstood ? { misunderstood: true } : {}) });
   };
 
   return (
     <Modal title={t("ui.game.command_title")} onClose={onCancel} wide>
-      <div class="cmd-list">
-        {available.map((c) => (
-          <button class="cmd-btn" aria-pressed={command === c.key} onClick={() => { setCommand(c.key); setPhrase(null); }}>
-            {practice ? t(c.hintKey) : `«${tl("uk", c.textKey)}»`}
-            <small>{practice ? "" : locale.value === "en" ? tl("en", c.textKey) : t(c.hintKey)}</small>
-          </button>
-        ))}
-      </div>
-      {practice && def && (
-        <fieldset style={{ marginTop: 10 }}>
-          <legend>{t("ui.game.choose_phrase")}</legend>
-          {phrases.map((k) => (
-            <label style={{ display: "flex" }}>
-              <input type="radio" name="phrase" checked={phrase === k} onChange={() => setPhrase(k)} />«{tl("uk", k)}»
-            </label>
-          ))}
-        </fieldset>
-      )}
-      <div class="row" style={{ marginTop: 10 }}>
+      {/* the recipient first: a click on a command already shouts it */}
+      <div class="row" style={{ marginBottom: 10 }}>
         <label>
           {t("ui.game.recipient")}
           <select value={recipient} onChange={(e) => setRecipient((e.target as HTMLSelectElement).value)}>
@@ -69,12 +52,30 @@ export function CommandDialog({ memberId, onConfirm, onCancel }: { memberId: str
               ))}
           </select>
         </label>
-        <span class="spacer" />
+      </div>
+      <div class="cmd-list">
+        {available.map((c) => (
+          <button class="cmd-btn" aria-pressed={command === c.key} onClick={() => (practice ? setCommand(c.key) : shout(c.key))}>
+            {practice ? t(c.hintKey) : `«${tl("uk", c.textKey)}»`}
+            <small>{practice ? "" : locale.value === "en" ? tl("en", c.textKey) : t(c.hintKey)}</small>
+          </button>
+        ))}
+      </div>
+      {practice && def && (
+        <fieldset style={{ marginTop: 10 }}>
+          <legend>{t("ui.game.choose_phrase")}</legend>
+          <div class="cmd-list">
+            {phrases.map((k) => (
+              <button class="cmd-btn" onClick={() => shout(def.key, k)}>
+                «{tl("uk", k)}»
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      )}
+      <div class="row" style={{ marginTop: 10, justifyContent: "flex-end" }}>
         <button class="btn secondary" onClick={onCancel}>
           {t("ui.cancel")}
-        </button>
-        <button class="btn" disabled={!command || (practice && !phrase)} onClick={confirm}>
-          {t("ui.game.shout")}
         </button>
       </div>
     </Modal>

@@ -5,6 +5,11 @@
     "width": 480,
     "height": 270
   },
+  "art_ravine_bg": {
+    "file": "art/art_ravine_bg.png",
+    "width": 640,
+    "height": 360
+  },
   "team_tie_knot": {
     "file": "characters/team_tie_knot.png",
     "width": 192,
@@ -126,5 +131,95 @@
     "file": "trees/tree_conifer_large.png",
     "width": 40,
     "height": 72
+  },
+  "knot_pryamyi": {
+    "file": "icons/knots/knot_pryamyi.png",
+    "width": 182,
+    "height": 49
+  },
+  "knot_providnyk_visimka": {
+    "file": "icons/knots/knot_providnyk_visimka.png",
+    "width": 196,
+    "height": 61
+  },
+  "knot_grapevine": {
+    "file": "icons/knots/knot_grapevine.png",
+    "width": 200,
+    "height": 58
+  },
+  "knot_zustrichna_visimka": {
+    "file": "icons/knots/knot_zustrichna_visimka.png",
+    "width": 200,
+    "height": 74
+  },
+  "knot_serednii_providnyk": {
+    "file": "icons/knots/knot_serednii_providnyk.png",
+    "width": 98,
+    "height": 64
+  },
+  "knot_podviinyi_providnyk": {
+    "file": "icons/knots/knot_podviinyi_providnyk.png",
+    "width": 58,
+    "height": 76
+  },
+  "knot_stremeno": {
+    "file": "icons/knots/knot_stremeno.png",
+    "width": 96,
+    "height": 63
+  },
+  "knot_uiaa": {
+    "file": "icons/knots/knot_uiaa.png",
+    "width": 75,
+    "height": 64
+  },
+  "knot_garda": {
+    "file": "icons/knots/knot_garda.png",
+    "width": 81,
+    "height": 66
+  },
+  "knot_akademichnyi": {
+    "file": "icons/knots/knot_akademichnyi.png",
+    "width": 186,
+    "height": 37
+  },
+  "knot_bramshkotovyi": {
+    "file": "icons/knots/knot_bramshkotovyi.png",
+    "width": 186,
+    "height": 35
+  },
+  "knot_bulin": {
+    "file": "icons/knots/knot_bulin.png",
+    "width": 78,
+    "height": 82
+  },
+  "knot_prusik": {
+    "file": "icons/knots/knot_prusik.png",
+    "width": 137,
+    "height": 61
+  },
+  "knot_avstriiskyi_skhopl": {
+    "file": "icons/knots/knot_avstriiskyi_skhopl.png",
+    "width": 140,
+    "height": 68
+  },
+  "knot_bakhmana": {
+    "file": "icons/knots/knot_bakhmana.png",
+    "width": 140,
+    "height": 67
+  },
+  "knot_providnyk_visimka_odnym": {
+    "file": "icons/knots/knot_providnyk_visimka_odnym.png",
+    "width": 196,
+    "height": 61
+  },
+  "knot_stremeno_odnym": {
+    "file": "icons/knots/knot_stremeno_odnym.png",
+    "width": 96,
+    "height": 63
+  },
+  "knot_prusik_odnym": {
+    "file": "icons/knots/knot_prusik_odnym.png",
+    "width": 137,
+    "height": 61
   }
 }

@@ -9,10 +9,11 @@
   "move": { "base": 30, "perDegreeAbove": 1, "aboveDeg": 15 },
   "makeBase": 120,
   "command": 5,
-  "detach": { "attachment": 20, "untie": 30, "unclip": 20, "dismantle_base": 60, "coil": 60, "pull_down": 30, "untieExtraThinHitch": 60 },
+  "detach": { "attachment": 20, "untie": 30, "unclip": 20, "dismantle_base": 60, "coil": 60, "pull_down": 30, "release": 5, "haul": 30, "untieExtraThinHitch": 60 },
   "passPerItem": 10,
   "maxPassItems": 3,
   "pickupPerItem": 5,
   "wear": 30,
-  "skip": 0
+  "skip": 0,
+  "ravine": { "holdEscort": 10, "takeEnd": 5, "buildPulley": 90, "rigRetrieval": 60, "retrieve": 30 }
 }

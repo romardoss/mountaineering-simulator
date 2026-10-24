@@ -100,12 +100,29 @@ export interface ActionDurations {
   move: { base: number; perDegreeAbove: number; aboveDeg: number };
   makeBase: number;
   command: number;
-  detach: { attachment: number; untie: number; unclip: number; dismantle_base: number; coil: number; pull_down: number; untieExtraThinHitch: number };
+  detach: { attachment: number; untie: number; unclip: number; dismantle_base: number; coil: number; pull_down: number; release: number; haul: number; untieExtraThinHitch: number };
   passPerItem: number;
   maxPassItems: number;
   pickupPerItem: number;
   wear: number;
   skip: number;
+  ravine: { holdEscort: number; takeEnd: number; buildPulley: number; rigRetrieval: number; retrieve: number };
+}
+
+/** Ravine crossing rules (CR-54 … CR-58, ravine.json). */
+export interface RavineRules {
+  /** Selectable поліспаст ratios 1:n (CR-61): tension = pullers × n. */
+  pulleyRatios: number[];
+  pulleyCarabiners: number;
+  /** Tension from which the перила hardly sag. */
+  goodTension: number;
+  /** «Тягнемо!» brings every free member within this path distance to the поліспаст (CR-66). */
+  pullRadiusM: number;
+  /** Metres along the перила per step. */
+  traverseMoveM: number;
+  /** Move factor on sagging (weakly tensioned) перила. */
+  sagMoveFactor: number;
+  score: { base: number; sagPoints: number; lostItemPoints: Record<string, number> };
 }
 
 export interface CommandDef {
@@ -232,4 +249,5 @@ export interface GameData {
   weights: EquipmentWeights;
   seasons: SeasonsData;
   individual: { always: IndividualEntry[]; winter: IndividualEntry[] };
+  ravine: RavineRules;
 }

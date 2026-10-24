@@ -1,5 +1,8 @@
 // Small DSL for readable scenario tests (ARCHITECTURE §8.2).
-import { gameData, hillPresets, kits } from "../../src/data/load";
+import { gameData, obstaclePresets, kits } from "../../src/data/load";
+import treesHill from "../fixtures/hills/skhyl-z-derevamy.json";
+import gentleHill from "../fixtures/hills/pologyi-travianystyi.json";
+import descentHill from "../fixtures/hills/spusk-zi-schylu.json";
 import { createEngine } from "../../src/engine";
 import type {
   ActionParams,
@@ -31,8 +34,11 @@ export function team(n: number): MemberConfig[] {
   }));
 }
 
+/** Former presets kept as test fixtures after CR-48 (no longer offered in the game). */
+const FIXTURES = [treesHill, gentleHill, descentHill] as unknown as HillConfig[];
+
 export function preset(id: string): HillConfig {
-  const h = hillPresets.find((p) => p.id === id);
+  const h = [...obstaclePresets, ...FIXTURES].find((p) => p.id === id);
   if (!h) throw new Error(`no preset ${id}`);
   return structuredClone(h);
 }

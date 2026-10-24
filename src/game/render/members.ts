@@ -69,6 +69,14 @@ export class MemberViews {
   onSelect: (id: string) => void = () => {};
   /** Pointer over / out of a member sprite (hover command button, CR-35). */
   onHover: (id: string | null) => void = () => {};
+  /** Feet position off the ground (hanging on ravine перила, CR-55); null = on the terrain. */
+  placeAt: (id: string, s: number) => { x: number; y: number; lying?: boolean } | null = () => null;
+  private lyingNow = new Set<string>();
+
+  /** Drawn lying under ravine перила this frame (CR-70). */
+  lying(id: string): boolean {
+    return this.lyingNow.has(id);
+  }
 
   constructor(private scene: Phaser.Scene, private world: WorldMap) {
     this.marker = scene.add.graphics().setDepth(29);
@@ -280,18 +288,24 @@ export class MemberViews {
     this.lastTime = time;
     for (const [id, v] of this.views) {
       const strolling = !v.posed && v.wander.off !== v.wander.target;
-      const p = this.world.at(v.s + v.offsetM + (v.posed ? 0 : v.wander.off));
-      const bob = v.bob || strolling ? (Math.floor(time / 160) % 2 === 0 ? -1 : 0) : 0;
+      const hang = this.placeAt(id, v.s);
+      const p = hang ?? this.world.at(v.s + v.offsetM + (v.posed ? 0 : v.wander.off));
+      const bob = !hang && (v.bob || strolling) ? (Math.floor(time / 160) % 2 === 0 ? -1 : 0) : 0;
+      // on the перила: horizontal, face up (−90° around the feet: head toward the start bank)
+      if (hang?.lying) this.lyingNow.add(id);
+      else this.lyingNow.delete(id);
+      const top = hang?.lying ? 12 : 31;
       v.sprite.setPosition(snap(p.x), snap(p.y) + bob);
-      v.sprite.setRotation(v.lean);
-      v.label.setPosition(snap(p.x), snap(p.y) - 31);
-      v.plan.setPosition(snap(p.x + v.label.width / 2 + 2), snap(p.y) - 32);
+      v.sprite.setRotation(hang?.lying ? -Math.PI / 2 : v.lean);
+      if (hang?.lying) v.sprite.setFlipX(false);
+      v.label.setPosition(snap(p.x - (hang?.lying ? 15 : 0)), snap(p.y) - top);
+      v.plan.setPosition(snap(p.x + v.label.width / 2 + 2), snap(p.y) - top - 1);
       if (id === this.selected) {
-        const x = snap(p.x);
-        const y = snap(p.y) - 43;
+        const x = snap(p.x - (hang?.lying ? 15 : 0));
+        const y = snap(p.y) - top - 12;
         this.marker.fillStyle(0x1a1c2c).fillTriangle(x - 4, y - 1, x + 4, y - 1, x, y + 4);
         this.marker.fillStyle(0xffd23f).fillTriangle(x - 3, y, x + 3, y, x, y + 3);
-        this.marker.lineStyle(1, 0xffd23f, 1).strokeEllipse(x, snap(p.y), 18, 5);
+        if (!hang?.lying) this.marker.lineStyle(1, 0xffd23f, 1).strokeEllipse(x, snap(p.y), 18, 5);
         v.label.setColor("#ffd23f").setText(v.label.getData("full") ?? "").setDepth(42);
       } else {
         // crowded teams: number only (name on the member card); colour is never the only cue

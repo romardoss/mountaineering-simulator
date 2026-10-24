@@ -111,6 +111,7 @@ export function createGame(data: GameData, scenario: Scenario, opts: CreateOptio
     bases: {},
     attachments: {},
     belays: {},
+    crossings: {},
     hazards: { pendingRockfalls: [] },
     protocol: { recent: [], belayReady: {}, climberGo: {}, climberSecured: {}, readySegments: {}, flagged: {} },
     stats: emptyStats(sc.team.map((m) => m.id)),

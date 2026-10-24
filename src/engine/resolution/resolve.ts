@@ -4,6 +4,7 @@ import { ACTIONS, PHASE_ORDER, validateAction } from "../actions/defs";
 import { dislodgeRolls, rockfallHits, rockfallWarnings } from "../hazards/rockfall";
 import { resolveFall, staticLoadRolls, terrainFallRolls } from "../hazards/falls";
 import { checkInvariants, checkTransition, InvariantViolation } from "../invariants/invariants";
+import { itemsLeftOnHill } from "../stats/stats";
 import {
   attachmentsOf,
   belaysAsClimber,
@@ -11,10 +12,11 @@ import {
   isActive,
   memberWeightKg,
   membersOnSegment,
+  ravineOf,
   segmentKey,
   weightBand,
 } from "../model/selectors";
-import type { GameEvent, GameState, MemberId, PlannedAction } from "../model/types";
+import type { ActionParams, GameEvent, GameState, MemberId, PlannedAction } from "../model/types";
 import type { RollScript } from "../rng/rng";
 import { createTx, type ProtectionSnapshot, type StepTx } from "./tx";
 
@@ -192,7 +194,8 @@ function bookkeeping(tx: StepTx, actions: PlannedAction[], executed: Set<MemberI
   if (members.some((m) => m.status === "injured")) {
     st.outcome = "lost";
     tx.emit({ type: "game.lost", severity: "danger", messageKey: "event.game_lost_injury", params: {}, refs: {} });
-  } else if (members.every((m) => inFinish(st, m))) {
+  } else if (members.every((m) => inFinish(st, m)) && (!ravineOf(st) || itemsLeftOnHill(st).length === 0)) {
+    // a ravine is won only with all equipment back; otherwise the team may still retrieve it or finish the level (CR-58)
     st.outcome = "won";
     for (const m of members) m.status = "finished";
     tx.emit({ type: "game.won", severity: "info", messageKey: "event.game_won", params: {}, refs: {} });
@@ -201,6 +204,51 @@ function bookkeeping(tx: StepTx, actions: PlannedAction[], executed: Set<MemberI
     tx.emit({ type: "game.lost", severity: "danger", messageKey: "event.game_lost_steps", params: { max: st.scenario.maxSteps }, refs: {} });
   }
   tx.emit({ type: "step.done", severity: "info", messageKey: "event.step_done", params: { step: st.step, seconds: dur }, refs: {} });
+}
+
+/** Ravine (CR-58): the whole team is on the finish bank, nobody injured. */
+export function canFinishLevel(state: GameState): boolean {
+  if (state.outcome !== "in_progress" || !ravineOf(state)) return false;
+  const members = Object.values(state.members);
+  return members.every((m) => m.status !== "injured" && inFinish(state, m));
+}
+
+/** Ends a ravine level: victory with all equipment back, otherwise completed with penalties. */
+export function finishLevel(state: GameState): GameState {
+  if (!canFinishLevel(state)) return state;
+  const s = structuredClone(state);
+  const left = itemsLeftOnHill(s);
+  s.outcome = left.length ? "completed" : "won";
+  for (const m of Object.values(s.members)) m.status = "finished";
+  s.log.push({ id: `${s.step}:end`, step: s.step, phase: "bookkeeping", type: left.length ? "game.completed" : "game.won", severity: left.length ? "warning" : "info", messageKey: left.length ? "event.level_completed" : "event.game_won", params: { count: left.length }, refs: {} });
+  return s;
+}
+
+/**
+ * A command shouted at once (CR-72): applied right away, no step, no time. It belongs to the step
+ * being planned (`step + 1`), exactly like a command given in that step's plan, so every protocol
+ * rule («Сам!» → untie next step, P1, «Камінь!») reads it the same way.
+ */
+export function shout(data: GameData, input: GameState, memberId: MemberId, params: ActionParams, opts: ResolveOptions = {}): StepResult {
+  if (input.outcome !== "in_progress" || params.kind !== "command") return { state: input, events: [] };
+  const check = opts.checkInvariants ?? true;
+  if (!validateAction({ data, state: input }, memberId, params).ok) return { state: input, events: [] };
+  if (check) deepFreeze(input);
+  const state: GameState = structuredClone(input);
+  state.step += 1;
+  const tx = createTx(data, state, snapshotOf(state), opts.rolls);
+  tx.phase = "commands";
+  ACTIONS.command.apply(tx, memberId, params);
+  state.step -= 1;
+  // ids distinct from the ones the step itself will use (`<step>:<n>`)
+  const before = input.log.filter((e) => e.step === input.step + 1).length;
+  tx.events.forEach((e, i) => (e.id = `${input.step + 1}:c${before + i}`));
+  if (check) {
+    const v = [...checkInvariants(data, state), ...checkTransition(data, input, state)];
+    if (v.length) throw new InvariantViolation(v);
+  }
+  state.log.push(...tx.events);
+  return { state, events: tx.events };
 }
 
 export function giveUp(state: GameState): GameState {

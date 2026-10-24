@@ -1,6 +1,7 @@
 // Creating knot instances and deriving their context (§13.3, ARCHITECTURE §4.7.1).
 import type { GameData } from "../data/types";
-import { geoOf } from "../model/selectors";
+import { geoOf, ravineOf } from "../model/selectors";
+import { bankAt } from "../geometry/hill";
 import type {
   BaseState,
   ControlKnot,
@@ -39,6 +40,9 @@ export function anchorKind(state: GameState, basePointId: string): "tree_large" 
 
 /** Context of tying a rope to a base (§13.3): carabiner, rock outcrop (CR-29), thick or thin tree. */
 export function anchorContext(state: GameState, base: BaseState): KnotContext {
+  // ravine перила are tied around the bank tree itself (CR-64)
+  const bank = ravineOf(state) && anchorKind(state, base.basePointId).startsWith("tree") ? bankAt(geoOf(state), base.pos.s) : null;
+  if (bank) return bank === "finish" ? "PERILA_FINISH" : "PERILA_START";
   if (base.carabinerId) return "ANCHOR_CARABINER";
   if (anchorKind(state, base.basePointId) === "rock_outcrop") return "ANCHOR_ROCK";
   return supportOf(state, base.basePointId) === "thin" ? "ANCHOR_THIN" : "ANCHOR_THICK";

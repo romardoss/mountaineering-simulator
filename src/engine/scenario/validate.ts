@@ -26,6 +26,8 @@ export function validateHill(data: GameData, hill: HillConfig): Issue[] {
   // Bases are built by members during the game; only a base spot at the finish is mandatory (CR-2).
   const spots = basePointsOf(hill); // incl. large trees (CR-31)
   if (!spots.some((b) => b.s >= geo.finishStart && b.s <= geo.totalLength)) out.push({ level: "error", key: "validate.no_finish_base" });
+  // a ravine needs an anchor for the перила on the start bank too (CR-52)
+  if (hill.type === "ravine" && !spots.some((b) => b.s <= geo.startZoneEnd)) out.push({ level: "error", key: "validate.no_start_base_ravine" });
   for (const bp of hill.basePoints) {
     if (bp.s < 0 || bp.s > geo.totalLength) out.push({ level: "error", key: "validate.base_outside", params: { id: bp.id } });
     if (bp.anchorType === "tree" && !hill.trees.some((t) => t.id === bp.treeId)) out.push({ level: "error", key: "validate.base_tree_missing", params: { id: bp.id } });
@@ -78,7 +80,8 @@ export function validateEquipment(data: GameData, scenario: Scenario): Issue[] {
   if (!taken.some((i) => i.type === "carabiner" && i.props.locking && i.props.shape === "hms")) out.push({ level: "warning", key: "validate.no_hms" });
   const hill = scenario.route.obstacles[0];
   if (hill) {
-    const longest = Math.max(0, ...normaliseSections(hill).map((s) => s.lengthM));
+    // a ravine rope must reach from bank to bank along the ground (CR-52)
+    const longest = hill.type === "ravine" ? Math.round(buildHillGeometry(hill).finishStart - hill.startZoneM + 4) : Math.max(0, ...normaliseSections(hill).map((s) => s.lengthM));
     const ropes = taken.filter((i) => i.type === "rope");
     if (ropes.length === 0) out.push({ level: "warning", key: "validate.no_rope" });
     else if (Math.max(...ropes.map((r) => r.props.lengthM ?? 0)) < longest) out.push({ level: "warning", key: "validate.rope_short", params: { longest } });

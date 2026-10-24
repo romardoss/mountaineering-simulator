@@ -2,9 +2,10 @@
 import { computed, signal } from "@preact/signals";
 import { createEngine } from "../engine";
 import { gameData, hillPresets, kits } from "../data/load";
-import type { ActionParams, GameEvent, GameState, HillConfig, MemberConfig, PlannedAction, Scenario, Season } from "../engine/model/types";
+import type { ActionParams, GameEvent, GameState, HillConfig, HistoryEntry, MemberConfig, Scenario, Season } from "../engine/model/types";
 import { buildKit } from "../engine/scenario/kit";
 import { settings } from "./settings";
+import { withDistinctRopeColors } from "./gear";
 
 export const engine = createEngine(gameData);
 export const data = gameData;
@@ -79,7 +80,7 @@ export function defaultScenario(hill: HillConfig = hillPresets[0]): Scenario {
     mode: "learning",
     seed: newSeed(),
     team,
-    items: buildKit(data, kits[0], team, "summer"),
+    items: withDistinctRopeColors(buildKit(data, kits[0], team, "summer")),
     maxSteps: null,
     weights: settings.value.weights,
   };
@@ -104,11 +105,10 @@ export function updateDraft(patch: Partial<Scenario> | ((d: Scenario) => Scenari
 export interface Session {
   scenario: Scenario;
   state: GameState;
-  history: PlannedAction[][];
+  /** Resolved steps and commands shouted at once between them (CR-72). */
+  history: HistoryEntry[];
   /** Planned main action per member for the current step. */
   plan: Record<string, ActionParams>;
-  /** Planned command per member: it does not use the member's step (CR-37). */
-  commands: Record<string, ActionParams>;
   /** Right-click targets (s) a member keeps walking to over several steps (CR-18); not autosaved. */
   goals: Record<string, number>;
   /** State before the last step (animation start). */
@@ -123,6 +123,8 @@ export const session = signal<Session | null>(null);
 
 /** Hill view → game screen requests (the view cannot render dialogs). */
 export const commandDialogFor = signal<string | null>(null);
+/** Hover rope icon (CR-62): the action picker opened at this member's rope actions. */
+export const ropePickerFor = signal<string | null>(null);
 export interface BaseConfirm {
   memberId: string;
   params: ActionParams;

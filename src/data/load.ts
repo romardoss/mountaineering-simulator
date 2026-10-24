@@ -14,13 +14,12 @@ import glossary from "./glossary.json";
 import weights from "./weights.json";
 import seasons from "./seasons.json";
 import individual from "./individual.json";
+import ravine from "./ravine.json";
 import typicalKit from "./presets/kits/typical.json";
-import trees from "./presets/hills/skhyl-z-derevamy.json";
-import gentle from "./presets/hills/pologyi-travianystyi.json";
 import rocky from "./presets/hills/skelno-osypnyi.json";
-import descent from "./presets/hills/spusk-zi-schylu.json";
 import overSummit from "./presets/hills/cherez-vershynu.json";
 import osinniiLyst from "./presets/hills/osinnii-lyst-2026-2-2.json";
+import skelnyiYar from "./presets/ravines/skelnyi-yar.json";
 
 export const gameData: GameData = Object.freeze({
   rules,
@@ -35,9 +34,16 @@ export const gameData: GameData = Object.freeze({
   weights,
   seasons,
   individual,
+  ravine,
 } as unknown as GameData);
 
-/** Default MVP preset first (§7.3.1.2). */
-export const hillPresets: HillConfig[] = [trees, gentle, rocky, descent, overSummit, osinniiLyst] as unknown as HillConfig[];
+/** Built-in hills, default first (§7.3.1.2); only these three are offered (CR-48). */
+export const hillPresets: HillConfig[] = [rocky, overSummit, osinniiLyst] as unknown as HillConfig[];
+
+/** Built-in ravines (CR-52): same HillConfig shape, `type: "ravine"`. */
+export const ravinePresets: HillConfig[] = [skelnyiYar] as unknown as HillConfig[];
+
+/** Every built-in obstacle (hills, then ravines). */
+export const obstaclePresets: HillConfig[] = [...hillPresets, ...ravinePresets];
 
 export const kits: KitDef[] = [typicalKit as unknown as KitDef];

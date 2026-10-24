@@ -3,6 +3,7 @@ import { useState } from "preact/hooks";
 import { t } from "../../i18n/i18n";
 import { kits } from "../../data/load";
 import { data, draft, updateDraft, withWeights } from "../../app/store";
+import { freshRopeColor, withDistinctRopeColors } from "../../app/gear";
 import { buildKit, defaultWeight, isIndividual, makeItem } from "../../engine/scenario/kit";
 import { memberLoadKg, validateEquipment } from "../../engine/scenario/validate";
 import type { ItemConfig, ItemProps, ItemType, MemberConfig } from "../../engine/model/types";
@@ -43,7 +44,7 @@ function itemLabel(it: ItemConfig): string {
     case "sling":
       return `${name} ${t("ui.cfg.eq.cm", { cm: p.lengthCm ?? 0 })}`;
     case "carabiner":
-      return `${name} ${p.locking ? t("ui.cfg.eq.locking_short") : t("ui.cfg.eq.nonlocking_short")}`; // no shape / «HMS» in names (CR-15)
+      return `${name} ${t("ui.cfg.eq.locking_short")}`; // locking only (CR-51), no shape / «HMS» (CR-15)
     case "belay_device":
       return `${name} ${p.model === "figure8" ? t("ui.cfg.eq.figure8") : "ATC"}`;
     case "lanyard":
@@ -88,20 +89,10 @@ function PropsEditor({ it, onChange }: { it: ItemConfig; onChange: (props: ItemP
       return (
         <div class="cfg-props">
           <select value={p.lengthCm} aria-label={t("ui.cfg.eq.length_cm")} onChange={(e) => onChange({ ...p, lengthCm: Number((e.target as HTMLSelectElement).value) })}>
-            {[60, 120, 240].map((x) => (
+            {[120, 240].map((x) => (
               <option value={x}>{t("ui.cfg.eq.cm", { cm: x })}</option>
             ))}
           </select>
-        </div>
-      );
-    case "carabiner":
-      return (
-        <div class="cfg-props">
-          <label>
-            <input type="checkbox" checked={!!p.locking} onChange={(e) => onChange({ ...p, locking: (e.target as HTMLInputElement).checked })} />
-            {t("ui.cfg.eq.locking")}
-          </label>
-          {/* no shape choice (CR-43): carabiners stay pear-shaped (HMS) internally */}
         </div>
       );
     case "lanyard":
@@ -168,6 +159,10 @@ export function EquipmentScreen() {
 
   const weightOf = (it: ItemConfig) => defaultWeight(d.weights, it.type, it.props);
 
+  /** A new rope never repeats another rope's colour (random among the free ones). */
+  const usedColors = (extra: ItemConfig[] = []) => [...d.items, ...extra].filter((i) => i.type === "rope").map((i) => i.props.color);
+  const recolor = (it: ItemConfig, extra: ItemConfig[] = []): ItemConfig => (it.type === "rope" ? { ...it, props: { ...it.props, color: freshRopeColor(usedColors(extra)) } } : it);
+
   /** Load of a member if item `it` were assigned to them. */
   const wouldExceed = (m: MemberConfig, it: ItemConfig) => {
     const others = d.items.filter((x) => x.id !== it.id);
@@ -204,7 +199,8 @@ export function EquipmentScreen() {
     if (target === have) return;
     setError(null);
     if (target > have) {
-      const extra: ItemConfig[] = Array.from({ length: target - have }, () => ({ ...structuredClone(g.first), id: newId(g.first.type), assignedTo: null }));
+      const extra: ItemConfig[] = [];
+      for (let i = have; i < target; i++) extra.push(recolor({ ...structuredClone(g.first), id: newId(g.first.type), assignedTo: null }, extra));
       return updateDraft((x) => ((x.items = [...x.items, ...extra]), x));
     }
     const order = (i: ItemConfig) => (i.assignedTo ? d.team.findIndex((m) => m.id === i.assignedTo!.memberId) : d.team.length);
@@ -220,7 +216,7 @@ export function EquipmentScreen() {
 
   const add = () => {
     const items: ItemConfig[] = [];
-    for (let i = 0; i < Math.max(1, Math.min(MAX_GROUP, addCount)); i++) items.push(makeItem(data, newId(addType), addType));
+    for (let i = 0; i < Math.max(1, Math.min(MAX_GROUP, addCount)); i++) items.push(recolor(makeItem(data, newId(addType), addType), items));
     updateDraft((x) => ((x.items = [...x.items, ...items]), x));
   };
 
@@ -234,7 +230,7 @@ export function EquipmentScreen() {
   const more = (m: MemberConfig, mine: ItemGroup) => {
     const free = groups.find((x) => x.key === mine.key)?.items.find((i) => !i.assignedTo);
     if (free) return assign(free.id, { memberId: m.id, as: "carried" });
-    const copy: ItemConfig = { ...structuredClone(mine.first), id: newId(mine.first.type), assignedTo: { memberId: m.id, as: "carried" } };
+    const copy: ItemConfig = recolor({ ...structuredClone(mine.first), id: newId(mine.first.type), assignedTo: { memberId: m.id, as: "carried" } });
     if (wouldExceed(m, copy)) return setError(t("ui.cfg.eq.err_over_max", { member: m.name, max: maxKg }));
     setError(null);
     updateDraft((x) => ((x.items = [...x.items, copy]), x));
@@ -284,7 +280,7 @@ export function EquipmentScreen() {
                 + {t("ui.cfg.eq.add")}
               </button>
               {d.mode === "learning" && (
-                <button class="btn small secondary" onClick={() => updateDraft((x) => ((x.items = buildKit(data, kits[0], x.team, x.season)), x))}>
+                <button class="btn small secondary" onClick={() => updateDraft((x) => ((x.items = withDistinctRopeColors(buildKit(data, kits[0], x.team, x.season))), x))}>
                   {t("kit.typical")}
                 </button>
               )}

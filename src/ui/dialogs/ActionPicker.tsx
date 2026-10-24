@@ -3,7 +3,7 @@ import { useState } from "preact/hooks";
 import { t } from "../../i18n/i18n";
 import { baseConfirm, data, engine, session } from "../../app/store";
 import { baseMissing, setPlannedAction } from "../../app/controller";
-import type { ActionOption, OptionGroup } from "../../engine/actions/options";
+import { isRopeAction, type ActionOption, type OptionGroup } from "../../engine/actions/options";
 import { belayEvalInput, fixEvalInput, grabEvalInput } from "../../engine/actions/defs";
 import type { ActionParams, ItemProps, KnotChoice } from "../../engine/model/types";
 import { Modal, Msg } from "../components/common";
@@ -14,7 +14,7 @@ import { optionLabel } from "./labels";
 import "../game.css";
 
 // no "move": members move by a right-click on the hill (CR-25)
-const GROUPS: OptionGroup[] = ["attach", "tie", "base", "belay", "command", "detach", "items", "skip"];
+const GROUPS: OptionGroup[] = ["attach", "tie", "base", "belay", "ravine", "command", "detach", "items", "skip"];
 
 type Stage =
   | { kind: "list" }
@@ -23,12 +23,13 @@ type Stage =
   | { kind: "items"; option: ActionOption }
   | { kind: "confirm"; params: ActionParams };
 
-export function ActionPicker({ memberId, onClose }: { memberId: string; onClose: () => void }) {
+/** `ropeOnly`: opened from the hover rope icon — only actions with a rope (CR-62). */
+export function ActionPicker({ memberId, onClose, ropeOnly = false }: { memberId: string; onClose: () => void; ropeOnly?: boolean }) {
   const s = session.value!;
   const state = s.state;
   const learning = s.scenario.mode === "learning";
   const member = state.members[memberId];
-  const options = engine.getActionOptions(state, memberId);
+  const options = engine.getActionOptions(state, memberId).filter((o) => !ropeOnly || isRopeAction(o));
   const [stage, setStage] = useState<Stage>({ kind: "list" });
 
   const commit = (params: ActionParams) => {
@@ -83,7 +84,7 @@ export function ActionPicker({ memberId, onClose }: { memberId: string; onClose:
   }
 
   return (
-    <Modal title={t("ui.game.picker_title", { name: member.name })} onClose={onClose} wide>
+    <Modal title={t(ropeOnly ? "ui.game.rope_picker_title" : "ui.game.picker_title", { name: member.name })} onClose={onClose} wide>
       {stage.kind === "list" && (
         <div>
           {GROUPS.map((g) => {
@@ -92,12 +93,15 @@ export function ActionPicker({ memberId, onClose }: { memberId: string; onClose:
             return (
               <div class="options-group">
                 <h3>{t(`group.${g}`)}</h3>
-                {list.map((o) => (
-                  <button class="option-btn" disabled={!o.enabled} title={o.enabled ? "" : formatKey(state, o.reasonKey ?? "", o.reasonParams)} onClick={() => choose(o)}>
-                    {optionLabel(state, o)}
-                    {!o.enabled && o.reasonKey && <span class="reason">{formatKey(state, o.reasonKey, o.reasonParams)}</span>}
-                  </button>
-                ))}
+                {/* the rope quick actions are a grid of tiles, like the knots (CR-71) */}
+                <div class={ropeOnly ? "action-tiles" : ""}>
+                  {list.map((o) => (
+                    <button class={ropeOnly ? "action-tile" : "option-btn"} disabled={!o.enabled} title={o.enabled ? "" : formatKey(state, o.reasonKey ?? "", o.reasonParams)} onClick={() => choose(o)}>
+                      {optionLabel(state, o)}
+                      {!o.enabled && o.reasonKey && <span class="reason">{formatKey(state, o.reasonKey, o.reasonParams)}</span>}
+                    </button>
+                  ))}
+                </div>
               </div>
             );
           })}

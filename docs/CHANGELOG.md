@@ -36,3 +36,18 @@
 10. **Game screen batch** (CR-32 … CR-41): parallax fix, belay options by clip state, «Страховка готова!» after setup, hover command button, «Зрозумів.», free commands, click tree/rock for a base, sling base by default with warning, gear icons ×N on cards, no «у нормі».
 11. **Equipment and knot dialog** (CR-42 … CR-45): stock-only pool, allocation from member panels, no carabiner shapes, labelled rope type, fixed knot-dialog footer.
 12. **Setup navigation and belay anchors** (CR-46, CR-47): «Назад» / «Далі» together on the right; belay «від бази» / «від себе» without self-belay.
+13. **Knot art**: `tools/process-assets.mjs` cuts the knot sheets in `assets/raw/knots/` into `assets/icons/knots/knot_<id>.png` (white background removed, «опора» text erased); «одним кінцем» variants reuse the base knot with a red cross on one end. The knot dialog shows tiles with the image and the name under it, and the knot reference («Вузли») shows the image beside each card; knots without art show text only.
+
+## 2026-10-24 — CR-48 … CR-59
+
+1. **Hills** (CR-48): only «Скельно-осипний схил» (default), «Через вершину» and «Осінній Лист 2026 2.2» are offered; the other presets are test fixtures now.
+2. **Gear** (CR-49 … CR-51): slings 120 / 240 cm only; main rope 55 m by default; no locking / non-locking choice — every carabiner is locking; old configurations are normalised on load.
+3. **New obstacle «Яр»** (CR-52): preset «Скельний яр» with the painted panorama as background.
+4. **Ravine crossing** (CR-53 … CR-57): first member crosses through the ravine on belay with the перила rope tied on; 3:1 поліспаст pulled together on «Тягнемо!» and tied off in the same step (more pullers → more tension, weak tension → sagging перила); crossing along the span with a супровід held by hand from a bank; the last member rigs a здьорг and the перила are pulled across from the finish bank.
+5. **Ravine completion** (CR-58): all gear back → victory; otherwise «Завершити рівень» → level completed with a score penalty per lost item.
+6. **Rope colours** (CR-59): every new rope gets a random colour no other rope has.
+7. **Static rope and поліспаст ratio** (CR-60, CR-61): the main rope is static by default (catalog and typical kit; the choice stays); «Зібрати поліспаст» offers 1:2, 1:3 or 1:4 — tension per puller follows the ratio.
+8. **Hover icons, goals, ravine tensioning** (CR-62 … CR-68): command and static / dynamic rope icons over members (rope icon opens the rope actions); a member who stumbles keeps walking to the right-click point; штик on the finish-bank tree, карабінна удавка on the start bank; «Взяти кінець мотузки»; «Два штики!» from the finish bank, then one «Тягнемо!» — everybody within 5 m pulls and the перила are tied off, the rope visibly tightens.
+9. **Command dialog** (CR-69): no «Крикнути» button — a click on the command shouts it (in phrase practice: a click on the phrasing).
+10. **Rope picker, pulling radius, перила look** (CR-70): the rope icon also offers самостраховка and страховка; «Тягнемо!» brings everybody within 10 m; well-tensioned перила are straight, weak ones sag under a person; people on the перила lie face up.
+11. **Quick rope actions and commands at once** (CR-71, CR-72): the rope icon also offers bases and shows a tile grid; a command is shouted the moment it is clicked — no step, no waiting.

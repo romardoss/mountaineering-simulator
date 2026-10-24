@@ -1,17 +1,21 @@
 // Movement limits (§7.2, §11.4): terrain budget and physical constraints.
 import type { GameData } from "../data/types";
-import { segmentAt, type HillGeometry } from "../geometry/hill";
+import { sAtWorldX, segmentAt, toWorld, type HillGeometry } from "../geometry/hill";
 import {
   attachmentsOf,
   belaysAsClimber,
+  crossingsOf,
   effectiveSurface,
   isRockSurface,
   findSegment,
   geoOf,
   harnessNodes,
+  heldNodes,
   memberWeightKg,
   ropeUsedM,
   segmentSpan,
+  tensionQuality,
+  traverseAttachment,
   weightMoveFactor,
 } from "../model/selectors";
 import type { GameState, MemberId, Surface } from "../model/types";
@@ -33,8 +37,32 @@ export function usesGrabbingKnot(state: GameState, memberId: MemberId): boolean 
   return attachmentsOf(state, memberId).some((a) => a.method === "grabbing_knot" && a.target.kind === "segment");
 }
 
+/**
+ * Along the перила (CR-55): `traverseMoveM` metres of the straight span between the two
+ * bank anchors per step, slower when the rope sags; returned as a distance in s.
+ */
+export function traverseReach(data: GameData, state: GameState, memberId: MemberId, dir: 1 | -1): number | null {
+  const a = traverseAttachment(state, memberId);
+  if (!a) return null;
+  const seg = findSegment(state, a.target.ropeId, a.target.lowerNodeId, a.target.upperNodeId);
+  if (!seg) return null;
+  const m = state.members[memberId];
+  const geo = geoOf(state, m.pos.obstacleIndex);
+  const [lo, hi] = segmentSpan(seg);
+  const p0 = toWorld(geo, lo);
+  const p1 = toWorld(geo, hi);
+  const span = Math.hypot(p1.x - p0.x, p1.y - p0.y) || 1;
+  const weak = tensionQuality(data, crossingsOf(state)[a.target.ropeId]) !== "good";
+  const dist = data.ravine.traverseMoveM * weightMoveFactor(data, memberWeightKg(state, memberId).total) * (weak ? data.ravine.sagMoveFactor : 1);
+  const x = toWorld(geo, m.pos.s).x;
+  const t = Math.max(0, Math.min(1, (x - p0.x) / (p1.x - p0.x || 1) + (dir * dist) / span));
+  return round2(Math.abs(sAtWorldX(geo, p0.x + t * (p1.x - p0.x)) - m.pos.s));
+}
+
 /** How far the member can move in one step over the terrain (multi-section budget). */
 export function terrainReach(data: GameData, state: GameState, memberId: MemberId, dir: 1 | -1): number {
+  const traverse = traverseReach(data, state, memberId, dir);
+  if (traverse !== null) return traverse;
   const m = state.members[memberId];
   const geo = geoOf(state, m.pos.obstacleIndex);
   let mult = weightMoveFactor(data, memberWeightKg(state, memberId).total);
@@ -91,7 +119,8 @@ export function constraintReach(data: GameData, state: GameState, memberId: Memb
       limit(Math.max(0, dir === 1 ? hi - s0 : s0 - lo), "reason.segment_end");
     }
   }
-  for (const { rope, node } of harnessNodes(state, memberId)) {
+  // tied in or carrying a held end (CR-65): the rope must reach
+  for (const { rope, node } of [...harnessNodes(state, memberId), ...heldNodes(state, memberId)]) {
     const len = state.items[rope.ropeId].props.lengthM ?? 0;
     // binary search the furthest s with rope used <= length (convex in s)
     const ok = (s: number) => ropeUsedM(state, data, rope, { nodeId: node.id, s }) <= len + 1e-9;

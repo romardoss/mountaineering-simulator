@@ -1,6 +1,7 @@
-// Довідник вузлів (§13.4.5). No knot art yet — names are shown as text.
+// Довідник вузлів (§13.4.5). Each card shows the knot art (if any) next to the text.
 import { t, tl } from "../../i18n/i18n";
 import { data, go, route } from "../../app/store";
+import { assetUrl } from "../../game/assets";
 import type { ContextRatingEntry } from "../../engine/data/types";
 import type { KnotContext, KnotRating } from "../../engine/model/types";
 import { TopBar } from "../components/common";
@@ -26,34 +27,40 @@ export function KnotReference() {
       <div class="screen-body">
         <h1>{t("ui.ref.knots_title")}</h1>
         <p class="muted">{t("ui.ref.knots_intro")}</p>
-        {data.knots.map((k) => (
-          <section class="panel ref-card" id={`knot-${k.id}`}>
-            <h2>
-              {knotName(k.id)} <span class="muted">({k.enRef})</span>
-            </h2>
-            {tl("uk", k.nameKey) !== knotName(k.id) && <p class="term-uk">{tl("uk", k.nameKey)}</p>}
-            <p>{t(`knot.${k.id}.description`)}</p>
-            <div class="row">
-              <span class="badge">{t(`category.${k.category}`)}</span>
-              <span>{t("ui.ref.control", { n: k.controlKnotsRequired })}</span>
-              {k.minTurns !== undefined && <span>{t("ui.ref.min_turns", { n: k.minTurns })}</span>}
-              {k.requires.map((r) => (
-                <span>{t(`ui.ref.requires.${r}`)}</span>
-              ))}
-              {k.constantLoadOnly && <span>{t("ui.ref.constant_load")}</span>}
-              {k.releasable && <span>{t("ui.ref.releasable")}</span>}
-            </div>
-            <div class="row" style={{ marginTop: 6 }}>
-              {ratingsFor(k.id).map((r) => (
-                <span>
-                  <span class={`badge ${r.rating}`}>{t(`rating.${r.rating}`)}</span> {t(`context.${r.context.toLowerCase()}`)}
-                  {r.viaCarabiner ? ` (${t("ui.ref.via_carabiner")})` : ""}
-                </span>
-              ))}
-              {ratingsFor(k.id).length === 0 && <span class="muted">{t("ui.ref.no_contexts")}</span>}
-            </div>
-          </section>
-        ))}
+        {data.knots.map((k) => {
+          const img = assetUrl(k.icon);
+          return (
+            <section class="panel ref-card" id={`knot-${k.id}`}>
+              {img && <img class="ref-knot-art" src={img} alt="" aria-hidden="true" />}
+              <div class="ref-card-text">
+                <h2>
+                  {knotName(k.id)} <span class="muted">({k.enRef})</span>
+                </h2>
+                {tl("uk", k.nameKey) !== knotName(k.id) && <p class="term-uk">{tl("uk", k.nameKey)}</p>}
+                <p>{t(`knot.${k.id}.description`)}</p>
+                <div class="row">
+                  <span class="badge">{t(`category.${k.category}`)}</span>
+                  <span>{t("ui.ref.control", { n: k.controlKnotsRequired })}</span>
+                  {k.minTurns !== undefined && <span>{t("ui.ref.min_turns", { n: k.minTurns })}</span>}
+                  {k.requires.map((r) => (
+                    <span>{t(`ui.ref.requires.${r}`)}</span>
+                  ))}
+                  {k.constantLoadOnly && <span>{t("ui.ref.constant_load")}</span>}
+                  {k.releasable && <span>{t("ui.ref.releasable")}</span>}
+                </div>
+                <div class="row" style={{ marginTop: 6 }}>
+                  {ratingsFor(k.id).map((r) => (
+                    <span>
+                      <span class={`badge ${r.rating}`}>{t(`rating.${r.rating}`)}</span> {t(`context.${r.context.toLowerCase()}`)}
+                      {r.viaCarabiner ? ` (${t("ui.ref.via_carabiner")})` : ""}
+                    </span>
+                  ))}
+                  {ratingsFor(k.id).length === 0 && <span class="muted">{t("ui.ref.no_contexts")}</span>}
+                </div>
+              </div>
+            </section>
+          );
+        })}
         <div>
           <button class="btn secondary" onClick={() => go(back)}>
             ← {t("ui.back")}

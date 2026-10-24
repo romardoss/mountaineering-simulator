@@ -19,7 +19,7 @@
   "ui.cfg.obstacle.rock": "Вертикальна скеля",
   "ui.cfg.obstacle.rock.desc": "Лазіння з нижньою страховкою та спуск по перилах.",
   "ui.cfg.obstacle.ravine": "Яр",
-  "ui.cfg.obstacle.ravine.desc": "Навісна переправа через провалля.",
+  "ui.cfg.obstacle.ravine.desc": "Спуск на страховці, перила з поліспастом, переправа із супроводом і здьорг.",
   "ui.cfg.obstacle.river": "Річка",
   "ui.cfg.obstacle.river.desc": "Переправа вбрід зі страховкою команди.",
   "ui.cfg.obstacle.soon": "Незабаром",
@@ -105,9 +105,7 @@
   "ui.cfg.eq.control.none": "без контрольки",
   "ui.cfg.eq.control.single": "бублик",
   "ui.cfg.eq.control.double": "напівгрепвайн",
-  "ui.cfg.eq.locking": "муфтований",
   "ui.cfg.eq.locking_short": "муфт.",
-  "ui.cfg.eq.nonlocking_short": "без муфти",
   "ui.cfg.eq.shape": "Форма",
   "ui.cfg.eq.shape.hms": "грушоподібний",
   "ui.cfg.eq.shape.d": "D-подібний",
@@ -185,5 +183,8 @@
   "ui.cfg.hill.auto_tree_spots": "Кожне велике дерево автоматично є місцем для бази (на схемі — блідіший прапорець).",
   "ui.cfg.eq.stock_hint": "Тут — підготовлений запас командного спорядження. Роздавайте його в колонках учасників («+ Взяти…», − / +).",
   "ui.cfg.eq.take": "Взяти спорядження: {member}",
-  "ui.cfg.eq.take_one": "Взяти…"
+  "ui.cfg.eq.take_one": "Взяти…",
+  "ui.cfg.lib.select_title_ravine": "Вибір яру",
+  "ui.cfg.lib.select_hint_ravine": "Оберіть один із заздалегідь підготовлених ярів.",
+  "ui.cfg.hill.depth": "Глибина: {m} м"
 }

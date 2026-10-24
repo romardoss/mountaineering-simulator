@@ -4,9 +4,9 @@ import type { GameData } from "./data/types";
 import { ACTIONS, validateAction, type Hint } from "./actions/defs";
 import { getActionOptions, type ActionOption } from "./actions/options";
 import { evaluateKnot, type KnotEvalInput } from "./knots/evaluate";
-import type { GameState, KnotEvaluation, Outcome, PlannedAction, Scenario } from "./model/types";
+import type { ActionParams, GameState, HistoryEntry, KnotEvaluation, Outcome, PlannedAction, Scenario } from "./model/types";
 import { createGame, type CreateOptions } from "./scenario/create";
-import { giveUp, resolveStep, type ResolveOptions, type StepResult } from "./resolution/resolve";
+import { canFinishLevel, finishLevel, giveUp, resolveStep, shout, type ResolveOptions, type StepResult } from "./resolution/resolve";
 import { computeStats, type Stats } from "./stats/stats";
 
 export interface MemberValidation {
@@ -31,11 +31,16 @@ export interface Engine {
   getActionOptions(state: GameState, memberId: string): ActionOption[];
   validatePlan(state: GameState, plan: PlannedAction[]): PlanValidation;
   resolveStep(state: GameState, plan: PlannedAction[], opts?: ResolveOptions): StepResult;
+  /** A command shouted at once, between steps (CR-72). */
+  shout(state: GameState, memberId: string, params: ActionParams, opts?: ResolveOptions): StepResult;
   evaluateKnot(input: KnotEvalInput): KnotEvaluation;
   getStats(state: GameState): Stats;
   getOutcome(state: GameState): Outcome;
   giveUp(state: GameState): GameState;
-  replay(scenario: Scenario, history: PlannedAction[][], opts?: ResolveOptions): GameState;
+  /** Ravine (CR-58): whole team on the finish bank → end the level (won / completed). */
+  canFinishLevel(state: GameState): boolean;
+  finishLevel(state: GameState): GameState;
+  replay(scenario: Scenario, history: HistoryEntry[], opts?: ResolveOptions): GameState;
 }
 
 export function createEngine(data: GameData): Engine {
@@ -61,13 +66,16 @@ export function createEngine(data: GameData): Engine {
       return { ok: [...Object.values(members), ...Object.values(commands)].every((m) => m.ok), members, commands };
     },
     resolveStep: (state, plan, opts) => resolveStep(data, state, plan, opts),
+    shout: (state, memberId, params, opts) => shout(data, state, memberId, params, opts),
     evaluateKnot: (input) => evaluateKnot(data, input),
     getStats: (state) => computeStats(data, state),
     getOutcome: (state) => state.outcome,
     giveUp: (state) => giveUp(state),
+    canFinishLevel: (state) => canFinishLevel(state),
+    finishLevel: (state) => finishLevel(state),
     replay: (scenario, history, opts) => {
       let s = createGame(data, scenario, { rolls: opts?.rolls });
-      for (const plan of history) s = resolveStep(data, s, plan, opts).state;
+      for (const h of history) s = Array.isArray(h) ? resolveStep(data, s, h, opts).state : shout(data, s, h.shout.memberId, h.shout.params, opts).state;
       return s;
     },
   };

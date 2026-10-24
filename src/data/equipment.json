@@ -1,5 +1,5 @@
 [
-  { "type": "rope", "nameKey": "item.rope", "icon": "icon_rope", "wearable": false, "defaults": { "lengthM": 50, "diameterMm": 10, "kind": "dynamic", "color": "#D93636" } },
+  { "type": "rope", "nameKey": "item.rope", "icon": "icon_rope", "wearable": false, "defaults": { "lengthM": 55, "diameterMm": 10, "kind": "static", "color": "#D93636" } },
   { "type": "cord", "nameKey": "item.cord", "icon": "icon_cord", "wearable": false, "defaults": { "lengthM": 1.5, "diameterMm": 6, "color": "#FFD23F" } },
   { "type": "sling", "nameKey": "item.sling", "icon": "icon_sling", "wearable": false, "defaults": { "lengthCm": 120, "color": "#5FA8F0" } },
   { "type": "carabiner", "nameKey": "item.carabiner", "icon": "icon_carabiner_locking", "wearable": false, "defaults": { "locking": true, "shape": "hms" } },

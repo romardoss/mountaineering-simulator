@@ -20,7 +20,10 @@ export type Season = "spring" | "summer" | "autumn" | "winter";
 /** Rolled once per game from the season (CR-11). */
 export type Weather = "dry" | "mud" | "rain";
 export type Mode = "learning" | "exam";
-export type RouteType = "ascent" | "descent" | "ascent_descent";
+/** `descent_ascent` = ravine: down one side, across the bottom, up the other (CR-52). */
+export type RouteType = "ascent" | "descent" | "ascent_descent" | "descent_ascent";
+/** Obstacle kinds that can be played (CR-52). */
+export type ObstacleType = "hill" | "ravine";
 
 // ---------------------------------------------------------------- obstacle
 
@@ -52,20 +55,28 @@ export interface BasePoint {
   treeId?: string;
 }
 
-/** Hill as configured (preset / editor / scenario file). */
+/**
+ * Hill or ravine as configured (preset / editor / scenario file). A ravine (CR-52) is
+ * `type: "ravine"`, `routeType: "descent_ascent"`: start bank → `sections` (down) →
+ * flat bottom → `ascentSections` (up) → finish bank.
+ */
 export interface HillConfig {
   id: string;
   nameKey?: string;
   name?: string;
-  type: "hill";
+  type: ObstacleType;
   routeType: RouteType;
   startZoneM: number;
   finishZoneM: number;
   summitZoneM?: number;
-  /** ascent / descent: the only side; ascent_descent: the ascent side. */
+  /** ascent / descent: the only side; ascent_descent: the ascent side; descent_ascent: the descent side. */
   sections: SectionConfig[];
   /** ascent_descent only. */
   descentSections?: SectionConfig[];
+  /** descent_ascent (ravine) only: flat bottom between the two sides (default 4 m). */
+  bottomZoneM?: number;
+  /** descent_ascent (ravine) only: the side climbed up to the finish bank. */
+  ascentSections?: SectionConfig[];
   trees: Tree[];
   basePoints: BasePoint[];
 }
@@ -149,7 +160,9 @@ export type StructureRef =
   | { kind: "base"; baseId: BaseId }
   | { kind: "attachment"; attachmentId: AttachmentId }
   | { kind: "belay"; belayId: BelayId }
-  | { kind: "knot"; knotId: KnotInstanceId };
+  | { kind: "knot"; knotId: KnotInstanceId }
+  /** Ravine crossing (CR-54, CR-57): поліспаст items and a separate здьорг rope. */
+  | { kind: "crossing"; ropeId: ItemId };
 
 /** PRD §9.2.1 — every item has exactly one location. */
 export type ItemLocation =
@@ -176,6 +189,8 @@ export type RopeNodeAttach =
   | { kind: "base"; baseId: BaseId; mode: "running" }
   | { kind: "base"; baseId: BaseId; mode: "doubled" }
   | { kind: "belay"; belayId: BelayId }
+  /** Супровід (CR-56): a member holds the rope by hand, no belay device; follows the member. */
+  | { kind: "held"; memberId: MemberId }
   | { kind: "free" };
 
 export interface RopeNode {
@@ -202,7 +217,10 @@ export type KnotContext =
   | "BELAY_UPPER"
   | "JOIN_SAME"
   | "JOIN_DIFF"
-  | "LOOP_CORD";
+  | "LOOP_CORD"
+  /** Ravine перила around a bank tree (CR-64): finish bank (штик), start bank (карабінна удавка). */
+  | "PERILA_FINISH"
+  | "PERILA_START";
 
 export type KnotRating = "correct" | "acceptable" | "wrong" | "dangerous";
 
@@ -279,6 +297,29 @@ export interface BelayRelation {
   inactiveThisStep: boolean;
 }
 
+/**
+ * Ravine перила (CR-54…CR-57): a rope fixed to bases on both banks, tensioned with a
+ * поліспаст and secured. Keyed by the перила rope id.
+ */
+export interface CrossingState {
+  ropeId: ItemId;
+  /** Base on which the поліспаст is built (the anchor that will be released by the здьорг). */
+  baseId: BaseId;
+  /** Поліспаст items (2 carabiners + prusik) and a separate здьорг rope, all `in_use` here. */
+  itemIds: ItemId[];
+  builtBy: MemberId;
+  /** Chosen ratio n of the 1:n поліспаст (CR-61); absent in saves before CR-61 = 3. */
+  ratio?: number;
+  /** Tension reached by the last coordinated pull (pullers × ratio). */
+  tension: number;
+  /** Tied off to the tree: only secured перила can be crossed. */
+  secured: boolean;
+  /** Members who crossed while the перила sagged (one penalty each, CR-55). */
+  sagged: MemberId[];
+  /** Система здьоргу prepared by the last participant: the rope that releases the anchor. */
+  retrieval: { pullRopeId: ItemId; by: MemberId } | null;
+}
+
 export interface PendingRockfall {
   id: string;
   createdStep: number;
@@ -303,6 +344,8 @@ export interface ProtocolState {
   readySegments: Record<string, number>;
   /** Belays that have already been flagged for P1/P2 (one violation per belay). */
   flagged: Record<string, true>;
+  /** Step in which a member on the finish bank shouted «Два штики!» (CR-67). */
+  twoHitches?: number;
 }
 
 // ---------------------------------------------------------------- scenario, state
@@ -322,7 +365,8 @@ export interface Scenario {
   weights: EquipmentWeights;
 }
 
-export type Outcome = "in_progress" | "won" | "lost" | "aborted";
+/** `completed` (CR-58): ravine finished by the whole team, but some equipment was left behind. */
+export type Outcome = "in_progress" | "won" | "completed" | "lost" | "aborted";
 
 export interface RngState {
   algo: "mulberry32";
@@ -344,6 +388,8 @@ export interface GameState {
   bases: Record<BaseId, BaseState>;
   attachments: Record<AttachmentId, Attachment>;
   belays: Record<BelayId, BelayRelation>;
+  /** Ravine перила by rope id (CR-54); absent in games saved before CR-54. */
+  crossings?: Record<ItemId, CrossingState>;
   hazards: { pendingRockfalls: PendingRockfall[] };
   protocol: ProtocolState;
   stats: StatsCounters;
@@ -436,7 +482,11 @@ export type CommandKey =
   | "fixed_rope_free"
   | "rock"
   | "hold"
-  | "understood";
+  | "understood"
+  /** «Тягнемо!» — everybody within reach of the поліспаст pulls at once (CR-54, CR-66). */
+  | "tension"
+  /** «Два штики!» — finish bank: the перила are tied with a штик, ready for tension (CR-67). */
+  | "two_hitches";
 
 export interface KnotChoice {
   knotId: string;
@@ -458,7 +508,15 @@ export type ActionParams =
   | { kind: "detach"; what: DetachTarget }
   | { kind: "pass"; toMemberId: MemberId; itemIds: ItemId[] }
   | { kind: "pickup"; itemIds: ItemId[] }
-  | { kind: "wear"; itemId: ItemId };
+  | { kind: "wear"; itemId: ItemId }
+  // ravine (CR-54 … CR-57)
+  | { kind: "hold_escort"; climberId: MemberId }
+  /** «Взяти кінець мотузки» (CR-65): hold a free end of a laid-out rope, no knot. */
+  | { kind: "take_end"; ropeId: ItemId; nodeId: string }
+  /** `ratio` n of a 1:n поліспаст, one of `ravine.pulleyRatios` (CR-61). */
+  | { kind: "build_pulley"; ropeId: ItemId; ratio: number }
+  | { kind: "rig_retrieval"; ropeId: ItemId; pullRopeId: ItemId }
+  | { kind: "retrieve"; ropeId: ItemId };
 
 export type DetachTarget =
   | { kind: "attachment"; attachmentId: AttachmentId }
@@ -466,7 +524,11 @@ export type DetachTarget =
   | { kind: "unclip"; ropeId: ItemId; nodeId: string }
   | { kind: "dismantle_base"; baseId: BaseId }
   | { kind: "coil"; ropeId: ItemId }
-  | { kind: "pull_down"; ropeId: ItemId };
+  | { kind: "pull_down"; ropeId: ItemId }
+  /** Let go of a held супровід rope (CR-56). */
+  | { kind: "release"; ropeId: ItemId; nodeId: string }
+  /** Haul a loose rope back across to oneself (CR-56). */
+  | { kind: "haul"; ropeId: ItemId };
 
 export type ActionKind = ActionParams["kind"];
 
@@ -474,3 +536,6 @@ export interface PlannedAction {
   memberId: MemberId;
   params: ActionParams;
 }
+
+/** Game history (CR-72): a resolved step, or a command shouted at once between steps. */
+export type HistoryEntry = PlannedAction[] | { shout: PlannedAction };

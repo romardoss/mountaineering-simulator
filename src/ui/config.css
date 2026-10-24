@@ -11,7 +11,7 @@
 .cfg-obstacle svg { width: 100%; height: auto; border: 2px solid var(--ink); image-rendering: pixelated; }
 .cfg-hills { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .cfg-hill h2 { margin: 0; }
-.cfg-hill.sel { outline: 4px solid var(--yellow); }
+.cfg-hill.sel, .cfg-obstacle.sel { outline: 4px solid var(--yellow); }
 .cfg-hill .cfg-preview { cursor: inherit; }
 .cfg-hill .cfg-info { font-size: 14px; gap: 8px; }
 .cfg-preview { width: 100%; background: #9fd3fa; border: 2px solid var(--ink); cursor: crosshair; display: block; }

@@ -464,24 +464,157 @@ async function processTrees(results) {
   }
 }
 
+// ---------- knot icons ----------
+
+// Raw sheets (white background, 2048² at 200×200 logical px): knot ids top → bottom; null = wrong in the raw, skipped.
+const KNOT_SHEETS = [
+  { file: "knots_sheet_1.jpg", knots: ["pryamyi", null, "providnyk_visimka"] },
+  // The blue ropes of the middle and bottom knots touch at the right edge → cut between them.
+  { file: "knots_sheet_2.jpg", knots: [null, "grapevine", "zustrichna_visimka"], cut: [[0, 1400], [2048, 1293]] },
+  { file: "knots_sheet_3.jpg", knots: ["serednii_providnyk", "podviinyi_providnyk", null] },
+  { file: "knots_sheet_4.jpg", knots: ["stremeno", "uiaa", "garda"] },
+  { file: "knots_sheet_5.jpg", knots: ["akademichnyi", "bramshkotovyi", "bulin"] },
+  { file: "knots_sheet_6.jpg", knots: ["prusik", "avstriiskyi_skhopl", "bakhmana"] },
+];
+const KNOT_GRID = 200;
+// "Одним кінцем" variants: the base knot's image with a red cross over one rope end (centre in output px).
+const KNOT_ONE_END = {
+  providnyk_visimka_odnym: { base: "providnyk_visimka", at: [14, 8] },
+  stremeno_odnym: { base: "stremeno", at: [88, 26] },
+  prusik_odnym: { base: "prusik", at: [63, 50] },
+};
+
+/** Draws a pixel X (red, 1 px dark outline) centred at (cx, cy), clipped to the image. */
+function drawCross(img, cx, cy, r = 6) {
+  const core = (dx, dy) => Math.max(Math.abs(dx), Math.abs(dy)) <= r && (Math.abs(dx - dy) <= 1 || Math.abs(dx + dy) <= 1);
+  for (let dy = -r - 2; dy <= r + 2; dy++)
+    for (let dx = -r - 2; dx <= r + 2; dx++) {
+      const x = cx + dx, y = cy + dy;
+      if (x < 0 || y < 0 || x >= img.w || y >= img.h) continue;
+      if (core(dx, dy)) setPx(img, x, y, dx === dy || dx === -dy ? [0xff, 0x30, 0x30] : [0xc0, 0x10, 0x10]);
+      else if ([-1, 0, 1].some((ox) => [-1, 0, 1].some((oy) => core(dx + ox, dy + oy)))) setPx(img, x, y, [0x1a, 0x1c, 0x2c]);
+    }
+}
+
+function isLight(r, g, b) {
+  return Math.min(r, g, b) > 215 && Math.max(r, g, b) - Math.min(r, g, b) < 35;
+}
+
+/** Paints big pure-black discs solid, erasing text baked into them ("опора" on the support). */
+function fillBlackDiscs(img) {
+  const { w, h, px } = img;
+  const black = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) black[i] = Math.max(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]) < 30 ? 1 : 0;
+  for (const c of components(black, w, h).comps) {
+    const bw = c.x1 - c.x0 + 1, bh = c.y1 - c.y0 + 1;
+    // Solid round blobs only — some sheets draw rope outlines pure black too.
+    if (c.area < 20000 || Math.abs(bw - bh) > 0.1 * bw || c.area < 0.75 * Math.PI * (bw / 2) ** 2) continue;
+    const cx = (c.x0 + c.x1 + 1) / 2, cy = (c.y0 + c.y1 + 1) / 2, r = bw / 2 - 2;
+    for (let y = Math.ceil(cy - r); y < cy + r; y++)
+      for (let x = Math.ceil(cx - r); x < cx + r; x++)
+        if ((x - cx) ** 2 + (y - cy) ** 2 < r * r) px.fill(0, (y * w + x) * 4, (y * w + x) * 4 + 3);
+  }
+}
+
+/** White-background mask: light pixels connected to the border and large light holes are background. */
+function whiteMask(img) {
+  const { w, h, px } = img;
+  const light = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) light[i] = isLight(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]) ? 1 : 0;
+  const { label, comps } = components(light, w, h);
+  const outer = new Set();
+  for (let x = 0; x < w; x++) { if (light[x]) outer.add(label[x]); if (light[(h - 1) * w + x]) outer.add(label[(h - 1) * w + x]); }
+  for (let y = 0; y < h; y++) { if (light[y * w]) outer.add(label[y * w]); if (light[y * w + w - 1]) outer.add(label[y * w + w - 1]); }
+  // Small enclosed light specks are highlights; larger holes (inside loops) are background.
+  const bg = comps.map((c) => outer.has(c.id) || c.area >= 400);
+  const m = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) m[i] = light[i] && bg[label[i]] ? 0 : 1;
+  return m;
+}
+
+/** Clears mask pixels along a segment (3 px wide) to separate touching sprites. */
+function cutMask(mask, w, h, [[x0, y0], [x1, y1]]) {
+  const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0));
+  for (let s = 0; s <= n; s++) {
+    const x = Math.round(x0 + ((x1 - x0) * s) / n), y = Math.round(y0 + ((y1 - y0) * s) / n);
+    for (let d = -1; d <= 1; d++) if (x >= 0 && x < w && y + d >= 0 && y + d < h) mask[(y + d) * w + x] = 0;
+  }
+}
+
+async function processKnots(results) {
+  const images = {};
+  for (const sheet of KNOT_SHEETS) {
+    const file = path.join(RAW, "knots", sheet.file);
+    if (!existsSync(file)) continue;
+    const img = await load(file);
+    const { w, h } = img;
+    fillBlackDiscs(img);
+    const mask = whiteMask(img);
+    if (sheet.cut) cutMask(mask, w, h, sheet.cut);
+    despeckle(mask, w, h, 2000);
+    const { label, comps } = components(mask, w, h);
+    const groups = splitByGaps(comps.filter((c) => c.area >= 2000), (c) => c.cy, sheet.knots.length);
+    const block = w / KNOT_GRID;
+    for (const [gi, id] of sheet.knots.entries()) {
+      if (!id) continue;
+      const ids = new Set(groups[gi].map((c) => c.id));
+      const km = new Uint8Array(w * h);
+      for (let i = 0; i < w * h; i++) if (mask[i] && ids.has(label[i])) km[i] = 1;
+      // Bbox snapped to the logical pixel grid.
+      const gx0 = Math.floor(Math.min(...groups[gi].map((c) => c.x0)) / block), gy0 = Math.floor(Math.min(...groups[gi].map((c) => c.y0)) / block);
+      const gx1 = Math.ceil((Math.max(...groups[gi].map((c) => c.x1)) + 1) / block), gy1 = Math.ceil((Math.max(...groups[gi].map((c) => c.y1)) + 1) / block);
+      const tw = gx1 - gx0, th = gy1 - gy0;
+      const out = downsample(img, km, gx0 * block, gy0 * block, tw * block, th * block, tw, th);
+      images[id] = out;
+    }
+  }
+  for (const [id, { base, at }] of Object.entries(KNOT_ONE_END)) {
+    if (!images[base]) continue;
+    const img = crop(images[base], 0, 0, images[base].w, images[base].h);
+    drawCross(img, at[0], at[1]);
+    images[id] = img;
+  }
+  for (const [id, img] of Object.entries(images)) {
+    const key = `knot_${id}`;
+    await savePng(img, path.join(OUT, "icons", "knots", `${key}.png`));
+    results.push({ id: key, group: "knots", file: `icons/knots/${key}.png`, width: img.w, height: img.h, warnings: KNOT_ONE_END[id] ? [`${KNOT_ONE_END[id].base} + cross`] : [] });
+  }
+}
+
 // ---------- key art ----------
 
 async function processArt(results) {
   const file = path.join(RAW, "art", "art_key_art.jpg");
-  if (!existsSync(file)) return;
+  if (!existsSync(file)) return processRavineBackground(results);
   const img = await load(file);
   const sw = Math.min(img.w, Math.round((img.h * 16) / 9));
   const sh = Math.round((sw * 9) / 16);
   const out = downsample(img, null, (img.w - sw) / 2, (img.h - sh) / 2, sw, sh, 480, 270, true);
   await savePng(out, path.join(OUT, "art", "art_key_art.png"));
   results.push({ id: "art_key_art", group: "art", file: "art/art_key_art.png", width: 480, height: 270, warnings: [] });
+  await processRavineBackground(results);
+}
+
+// Ravine background (CR-52): the user's panorama of a gorge between two grassy banks.
+const RAVINE_RAW = "Піксельна панорама гірської долини.png";
+
+async function processRavineBackground(results) {
+  const file = path.join(RAW, "art", RAVINE_RAW);
+  if (!existsSync(file)) return;
+  const img = await load(file);
+  const [W, H] = [640, 360];
+  const sw = Math.min(img.w, Math.round((img.h * W) / H));
+  const sh = Math.round((sw * H) / W);
+  const out = downsample(img, null, (img.w - sw) / 2, (img.h - sh) / 2, sw, sh, W, H, true);
+  await savePng(out, path.join(OUT, "art", "art_ravine_bg.png"));
+  results.push({ id: "art_ravine_bg", group: "art", file: "art/art_ravine_bg.png", width: W, height: H, warnings: [] });
 }
 
 // ---------- contact sheet ----------
 
 async function contactSheet(results, dir) {
   await mkdir(dir, { recursive: true });
-  for (const group of ["characters", "terrain", "trees", "art"]) {
+  for (const group of ["characters", "terrain", "trees", "knots", "art"]) {
     const items = results.filter((r) => r.group === group);
     if (!items.length) continue;
     const scale = group === "art" ? 2 : 4;
@@ -510,6 +643,7 @@ await processArt(results);
 await processTeam(results);
 await processTerrain(results);
 await processTrees(results);
+await processKnots(results);
 
 const manifest = {
   _note: "Generated by tools/process-assets.mjs from assets/raw. Team sheets: 7 rows (members 1–7) × `frames` columns of 32×32 cells (deviation from the 16×32 spec: lying/falling poses are wide); pivot (16,31) = feet, bottom-centre of each cell. Characters face right.",

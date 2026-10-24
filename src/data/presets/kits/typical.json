@@ -18,9 +18,9 @@
       "type": "rope",
       "count": 2,
       "props": {
-        "lengthM": 50,
+        "lengthM": 55,
         "diameterMm": 10,
-        "kind": "dynamic"
+        "kind": "static"
       },
       "assign": "spread_heavy"
     },

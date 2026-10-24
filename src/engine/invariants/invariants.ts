@@ -1,6 +1,6 @@
 // Equipment accountability invariants (§9.2, ARCHITECTURE §4.11).
 import type { GameData } from "../data/types";
-import { carabinerLoad, itemPos, memberWeightKg, ropeUsedM } from "../model/selectors";
+import { carabinerLoad, crossingsOf, itemPos, memberWeightKg, ropeUsedM } from "../model/selectors";
 import type { GameState, StructureRef } from "../model/types";
 
 export interface Violation {
@@ -26,6 +26,8 @@ function structureExists(state: GameState, st: StructureRef): boolean {
       return !!state.belays[st.belayId];
     case "knot":
       return !!state.knots[st.knotId];
+    case "crossing":
+      return !!crossingsOf(state)[st.ropeId];
   }
 }
 
@@ -43,6 +45,8 @@ function structureHolds(state: GameState, st: StructureRef, itemId: string): boo
     }
     case "knot":
       return state.knots[st.knotId].itemId !== itemId;
+    case "crossing":
+      return crossingsOf(state)[st.ropeId].itemIds.includes(itemId);
   }
 }
 
@@ -69,6 +73,10 @@ export function checkInvariants(data: GameData, state: GameState): Violation[] {
   for (const b of Object.values(state.bases)) for (const id of b.itemIds) {
     const l = state.items[id]?.location;
     if (!l || l.kind !== "in_use" || l.structure.kind !== "base" || l.structure.baseId !== b.id) out.push({ rule: "9.2.1", detail: `base ${b.id} lists ${id} it does not hold` });
+  }
+  for (const c of Object.values(crossingsOf(state))) for (const id of c.itemIds) {
+    const l = state.items[id]?.location;
+    if (!l || l.kind !== "in_use" || l.structure.kind !== "crossing" || l.structure.ropeId !== c.ropeId) out.push({ rule: "9.2.1", detail: `crossing ${c.ropeId} lists ${id} it does not hold` });
   }
   for (const a of Object.values(state.attachments)) for (const id of a.itemIds) {
     const l = state.items[id]?.location;

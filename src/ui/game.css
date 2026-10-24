@@ -18,9 +18,10 @@
 .option-btn:focus-visible { outline: 3px solid var(--yellow); }
 
 .knot-groups { display: flex; flex-direction: column; gap: 8px; }
-.knot-tiles { display: flex; flex-wrap: wrap; gap: 6px; }
-.knot-tile { font-family: var(--font-body); font-size: 16px; padding: 6px 8px; min-width: 150px; text-align: left; background: #fffaf0; border: 2px solid var(--ink); cursor: pointer; }
-.knot-tile small { display: block; font-size: 12px; color: var(--ink-soft); }
+.knot-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.knot-tile { font-family: var(--font-body); font-size: 16px; padding: 6px 8px; min-height: 108px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; text-align: center; background: #fffaf0; border: 2px solid var(--ink); cursor: pointer; }
+.knot-tile img { width: 100%; height: 72px; object-fit: contain; flex: 1 1 auto; }
+.knot-tile.no-art { justify-content: center; }
 .knot-tile[aria-pressed="true"] { background: var(--yellow); }
 .knot-tile:focus-visible { outline: 3px solid var(--hint); }
 
@@ -32,10 +33,17 @@
 .outcome-banner { font-family: var(--font-title); font-size: 18px; padding: 14px; text-align: center; border: 4px solid var(--ink); }
 .outcome-banner.won { background: #7ed98f; }
 .outcome-banner.lost { background: #ff9a8a; }
+.outcome-banner.completed { background: #ffd98a; }
 .outcome-banner.aborted { background: var(--grey); }
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .kv { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px dotted var(--wood-2); }
-.ref-card { margin-bottom: 10px; }
+.ref-card { margin-bottom: 10px; display: flex; gap: 12px; align-items: flex-start; }
+.ref-card-text { flex: 1; min-width: 0; }
+.ref-knot-art { flex: none; width: 240px; height: 120px; object-fit: contain; image-rendering: pixelated; background: #fffaf0; border: 2px solid var(--ink); padding: 4px; }
+@media (max-width: 640px) {
+  .ref-card { flex-direction: column; }
+  .ref-knot-art { width: 100%; }
+}
 .set-weights { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 16px; margin: 8px 0; }
 .set-weight { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .set-weight input { width: 80px; }
@@ -45,3 +53,10 @@
 .item-icon { image-rendering: pixelated; flex: none; }
 .member-card .action.command { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 .member-card .action.command .btn-ghost { margin-left: auto; }
+/* rope quick actions as a grid of tiles, like the knot tiles (CR-71) */
+.action-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; }
+.action-tile { font-family: var(--font-body); font-size: 15px; padding: 8px; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; background: #fffaf0; border: 2px solid var(--ink); cursor: pointer; color: inherit; }
+.action-tile:hover:not([disabled]) { background: var(--yellow); }
+.action-tile:focus-visible { outline: 3px solid var(--hint); }
+.action-tile[disabled] { cursor: not-allowed; opacity: 0.6; }
+.action-tile .reason { font-size: 12px; color: var(--danger); }

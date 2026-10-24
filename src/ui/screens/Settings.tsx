@@ -47,9 +47,9 @@ function Weights() {
         <Kg label={t("ui.set.backpack")} value={w.backpackBaseKg} min={10} max={25} step={0.5} onChange={(v) => set("backpackBaseKg", v)} />
         <Kg label={t("ui.set.rope_per_m", { item: t("item.rope") })} value={w.ropePerMeterKg} min={0.01} max={0.2} step={0.005} onChange={(v) => set("ropePerMeterKg", v)} />
         <Kg label={t("ui.set.per_m", { item: t("item.cord") })} value={w.cordPerMeterKg} min={0.01} max={0.2} step={0.005} onChange={(v) => set("cordPerMeterKg", v)} />
-        {(["60", "120", "240"] as const).map((cm) => variant("slingKg", cm, "sling", t("ui.cfg.eq.cm", { cm })))}
+        {/* only the gear that can be taken: 120 / 240 cm slings (CR-49), locking carabiners (CR-51) */}
+        {(["120", "240"] as const).map((cm) => variant("slingKg", cm, "sling", t("ui.cfg.eq.cm", { cm })))}
         {variant("carabinerKg", "locking", "carabiner", t("ui.cfg.eq.locking_short"))}
-        {variant("carabinerKg", "nonLocking", "carabiner", t("ui.cfg.eq.nonlocking_short"))}
         {variant("belayDeviceKg", "atc", "belay_device", "ATC")}
         {variant("belayDeviceKg", "figure8", "belay_device", t("ui.cfg.eq.figure8"))}
         {item("harnessKg", "harness")}

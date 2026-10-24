@@ -2,7 +2,7 @@
 // assess (unsafe-but-possible hints), apply (effects + events), duration.
 import { evaluateKnot, knotDef } from "../knots/evaluate";
 import { anchorContext, anchorKind, createKnot, removeKnot, supportOf } from "../knots/instance";
-import { angleAt, basePointsOf, downhillDir, isAdjacent, isSafeZone } from "../geometry/hill";
+import { angleAt, bankAt, basePointsOf, downhillDir, isAdjacent, isSafeZone } from "../geometry/hill";
 import {
   anyCarabiner,
   attachmentsOf,
@@ -12,14 +12,22 @@ import {
   belaysAsClimber,
   carabinerLoad,
   carried,
+  crossingsOf,
   elevationOfS,
+  escortedBy,
   findSegment,
+  gapSegmentOf,
   geoOf,
   harnessNodes,
+  inFinish,
+  isGapSegment,
   isLockingCarabiner,
   memberWeightKg,
   pickCarabiner,
+  ravineOf,
   segmentKey,
+  tensionQuality,
+  traverseAttachment,
   wears,
 } from "../model/selectors";
 import type {
@@ -28,6 +36,7 @@ import type {
   Attachment,
   BaseState,
   BelayRelation,
+  CrossingState,
   GameState,
   ItemState,
   KnotChoice,
@@ -143,7 +152,15 @@ export function removeBase(tx: StepTx, base: BaseState, giveTo: MemberId | null)
   }
   for (const a of Object.values(tx.state.attachments)) if (a.target.kind === "base" && a.target.baseId === base.id) removeAttachment(tx, a);
   for (const b of Object.values(tx.state.belays)) if (b.anchor.kind === "base" && b.anchor.baseId === base.id) b.anchor = { kind: "body" };
+  // a failed поліспаст anchor drops the поліспаст (CR-54)
+  for (const c of Object.values(crossingsOf(tx.state))) if (c.baseId === base.id) removeCrossing(tx, c, { ...base.pos });
   delete tx.state.bases[base.id];
+}
+
+/** Поліспаст / здьорг items end up on the ground at `pos`; the перила are no longer tensioned. */
+export function removeCrossing(tx: StepTx, c: CrossingState, pos: Position) {
+  for (const id of c.itemIds) tx.setLocation(id, { kind: "on_ground", pos: { ...pos } });
+  delete tx.state.crossings![c.ropeId];
 }
 
 /** Rope deployed from a carried coil. */
@@ -215,6 +232,9 @@ const command: ActionDef<ParamsOf<"command">> = {
     if (p.command === "go") for (const b of belaysAsClimber(st, m)) pr.climberGo[b.id] = st.step;
     if (p.command === "secured") for (const b of belaysAsClimber(st, m)) pr.climberSecured[b.id] = st.step;
     if (p.command === "fixed_rope_ready") for (const seg of belayableSegments(st)) pr.readySegments[seg.key] = st.step;
+    // ravine (CR-66, CR-67): the finish bank reports the штик; «Тягнемо!» tensions the перила
+    if (p.command === "two_hitches" && ravineOf(st) && bankAt(geoOf(st), st.members[m].pos.s) === "finish") pr.twoHitches = st.step;
+    if (p.command === "tension" && ravineOf(st)) pullTogether(tx, m);
   },
   duration: (ctx) => ctx.data.actions.command,
 };
@@ -233,6 +253,12 @@ const move: ActionDef<ParamsOf<"move">> = {
   phase: "movement",
   validate: (ctx, m, p) => {
     if (!(p.distanceM > 0)) return fail("reason.distance_zero");
+    // along the перила: only secured перила, and only with a супровід (CR-55, CR-56)
+    const tr = traverseAttachment(ctx.state, m);
+    if (tr) {
+      if (!crossingsOf(ctx.state)[tr.target.ropeId]?.secured) return fail("reason.traverse_not_secured");
+      if (escortedBy(ctx.state, m).length === 0) return fail("reason.no_escort");
+    }
     const r = moveReach(ctx, m, p.toward);
     if (r.reach < 0.05) return fail(r.constraint.reasonKey ?? "reason.cannot_move");
     return OK;
@@ -274,13 +300,27 @@ const move: ActionDef<ParamsOf<"move">> = {
     mem.pos = { ...mem.pos, s: to };
     syncMemberNodes(st, m);
     tx.moved.set(m, { from, to });
+    const tr = traverseAttachment(st, m);
+    const crossing = tr && crossingsOf(st)[tr.target.ropeId];
+    if (crossing && tensionQuality(tx.data, crossing) !== "good" && !crossing.sagged.includes(m)) {
+      // weak tension: the перила sag, the crossing is slow and costs points (CR-55)
+      crossing.sagged.push(m);
+      tx.emit({ type: "traverse.sag", severity: "warning", messageKey: "event.traverse_sag", params: { member: m, tension: crossing.tension }, refs: { members: [m] } });
+      tx.mistake("summary.traverse_sag", { member: m });
+    }
     const geo = geoOf(st);
+    if (tr) {
+      // along the перила: no height change, the ground below does not count (CR-55)
+      tx.emit({ type: "member.moved", severity: "info", messageKey: "event.moved_traverse", params: { member: m, from, to }, refs: { members: [m] } });
+      return;
+    }
     const dz = elevationOfS(geo, to) - elevationOfS(geo, from);
     if (dz >= 0) st.stats.members[m].distanceUpM += Math.abs(to - from);
     else st.stats.members[m].distanceDownM += Math.abs(to - from);
     tx.emit({ type: "member.moved", severity: "info", messageKey: dz >= 0 ? "event.moved_up" : "event.moved_down", params: { member: m, distance: Math.round(dist * 10) / 10, from, to }, refs: { members: [m] } });
   },
   duration: (ctx, m, p) => {
+    if (traverseAttachment(ctx.state, m)) return ctx.data.actions.move.base; // hanging on the перила: the slope does not matter
     const geo = geoOf(ctx.state);
     const from = posOf(ctx, m).s;
     const to = Math.max(0, Math.min(geo.totalLength, from + dirOf(p.toward) * p.distanceM));
@@ -295,7 +335,7 @@ export function syncMemberNodes(state: GameState, m: MemberId) {
   const pos = state.members[m].pos;
   for (const rope of Object.values(state.ropes)) {
     for (const n of rope.nodes) {
-      if (n.attach.kind === "member_harness" && n.attach.memberId === m) n.pos = { ...pos };
+      if ((n.attach.kind === "member_harness" || n.attach.kind === "held") && n.attach.memberId === m) n.pos = { ...pos };
       if (n.attach.kind === "belay") {
         const b = state.belays[n.attach.belayId];
         if (b && b.belayerId === m) n.pos = { ...pos };
@@ -362,6 +402,14 @@ const attach: ActionDef<ParamsOf<"attach">> = {
     if (!t.ok) return fail("reason.target_missing");
     if (!t.near(posOf(ctx, m))) return fail("reason.not_adjacent");
     if (p.target.kind === "base" && p.method === "grabbing_knot") return fail("reason.grab_needs_rope");
+    if (p.target.kind === "segment") {
+      const seg = findSegment(ctx.state, p.target.ropeId, p.target.lowerNodeId, p.target.upperNodeId);
+      // перила over a ravine (CR-55): harness only, clipped in on a bank
+      if (seg && isGapSegment(ctx.state, seg)) {
+        if (p.method === "hand") return fail("reason.traverse_needs_harness");
+        if (!bankAt(geoOf(ctx.state), posOf(ctx, m).s)) return fail("reason.traverse_from_bank");
+      }
+    }
     const same = attachmentsOf(ctx.state, m).some((a) => JSON.stringify(a.target) === JSON.stringify(p.target) && a.method === p.method);
     if (same) return fail("reason.already_attached");
     const nonHand = attachmentsOf(ctx.state, m).filter((a) => a.method !== "hand").length;
@@ -511,7 +559,7 @@ export function fixEvalInput(ctx: ReadCtx, base: BaseState, ropeId: string, m?: 
 
 /** Node of an in-use rope that a member at the base can fix: a free end or the member's own tie-in. */
 function fixableNode(ctx: ReadCtx, m: MemberId, rope: RopeLayout, base: BaseState): RopeNode | undefined {
-  const own = nodeOfMember(rope, m);
+  const own = nodeOfMember(rope, m) ?? rope.nodes.find((n) => n.attach.kind === "held" && n.attach.memberId === m);
   if (own && adj(ctx, own.pos, base.pos)) return own;
   // a free end at the base, or one the member can reach and carry to it
   return freeEndNear(ctx, rope, base.pos) ?? freeEndNear(ctx, rope, posOf(ctx, m));
@@ -771,6 +819,7 @@ const stopBelay: ActionDef<ParamsOf<"stop_belay">> = {
 function ropeBusy(state: GameState, ropeId: string, except?: MemberId): boolean {
   const rope = state.ropes[ropeId];
   if (!rope) return false;
+  if (crossingsOf(state)[ropeId]) return true; // tensioned перила (CR-54)
   if (rope.nodes.some((n) => n.attach.kind === "member_harness" && n.attach.memberId !== except)) return true;
   if (rope.nodes.some((n) => n.attach.kind === "belay")) return true;
   return Object.values(state.attachments).some((a) => a.target.kind === "segment" && a.target.ropeId === ropeId);
@@ -834,6 +883,7 @@ const detach: ActionDef<ParamsOf<"detach">> = {
           if (onBelay.length && !mayLeaveBelay(ctx, m, onBelay)) return fail("reason.still_on_belay");
           return OK;
         }
+        if (n.attach.kind === "base" && crossingsOf(st)[w.ropeId]?.baseId === n.attach.baseId) return fail("reason.pulley_on_node");
         if (n.attach.kind === "base" && n.attach.mode === "fixed") return OK;
         if (n.attach.kind === "base" && n.attach.mode === "doubled") return ropeBusy(st, w.ropeId) ? fail("reason.rope_in_use") : OK;
         return fail("reason.nothing_to_untie");
@@ -863,6 +913,19 @@ const detach: ActionDef<ParamsOf<"detach">> = {
         if (rope.nodes.some((n) => n.attach.kind !== "free")) return fail("reason.rope_still_tied");
         if (ropeBusy(st, w.ropeId)) return fail("reason.rope_in_use");
         return canWeigh(ctx, m, st.items[w.ropeId].weightKg) ? OK : fail("reason.too_heavy");
+      }
+      case "release": {
+        const n = st.ropes[w.ropeId]?.nodes.find((x) => x.id === w.nodeId);
+        return n && n.attach.kind === "held" && n.attach.memberId === m ? OK : fail("reason.target_missing");
+      }
+      case "haul": {
+        const rope = st.ropes[w.ropeId];
+        if (!rope) return fail("reason.target_missing");
+        const mine = (n: RopeNode) => (n.attach.kind === "held" && n.attach.memberId === m) || (n.attach.kind === "free" && adj(ctx, n.pos, here));
+        if (!rope.nodes.some(mine)) return fail("reason.no_free_end_near");
+        if (rope.nodes.some((n) => !mine(n) && n.attach.kind !== "free")) return fail("reason.rope_still_tied");
+        if (ropeBusy(st, w.ropeId)) return fail("reason.rope_in_use");
+        return OK;
       }
       case "pull_down": {
         const rope = st.ropes[w.ropeId];
@@ -930,6 +993,21 @@ const detach: ActionDef<ParamsOf<"detach">> = {
         delete st.ropes[w.ropeId];
         tx.setLocation(w.ropeId, { kind: "carried", memberId: m });
         ev("event.rope_coiled");
+        return;
+      }
+      case "release": {
+        const n = st.ropes[w.ropeId].nodes.find((x) => x.id === w.nodeId)!;
+        n.attach = { kind: "free" };
+        ev("event.escort_released");
+        return;
+      }
+      case "haul": {
+        // the whole loose rope comes across to the member (CR-56)
+        for (const n of st.ropes[w.ropeId].nodes) {
+          n.attach = { kind: "free" };
+          n.pos = { ...st.members[m].pos };
+        }
+        ev("event.rope_hauled");
         return;
       }
       case "pull_down": {
@@ -1035,6 +1113,282 @@ const wear: ActionDef<ParamsOf<"wear">> = {
   duration: (ctx) => ctx.data.actions.wear,
 };
 
+
+// ---------------------------------------------------------------- ravine: супровід, поліспаст, здьорг (CR-54 … CR-57)
+
+function crossingOf(ctx: ReadCtx, ropeId: string): CrossingState | undefined {
+  return crossingsOf(ctx.state)[ropeId];
+}
+
+function nearCrossing(ctx: ReadCtx, m: MemberId, c: CrossingState): boolean {
+  const base = ctx.state.bases[c.baseId];
+  return !!base && adj(ctx, posOf(ctx, m), base.pos);
+}
+
+function onBank(ctx: ReadCtx, m: MemberId): boolean {
+  return bankAt(geoOf(ctx.state), posOf(ctx, m).s) !== null;
+}
+
+/** Free node of a rope the climber is tied into, within reach of the holder. */
+function escortRopeFor(ctx: ReadCtx, m: MemberId, climberId: MemberId): RopeNode | undefined {
+  for (const { rope } of harnessNodes(ctx.state, climberId)) {
+    if (rope.nodes.some((n) => n.attach.kind === "held" && n.attach.memberId === m)) continue;
+    const node = rope.nodes.find((n) => n.attach.kind === "free" && adj(ctx, n.pos, posOf(ctx, m)));
+    if (node) return node;
+  }
+  return undefined;
+}
+
+/** Супровід: hold the rope of a member on the перила by hand — no belay device (CR-56). */
+const holdEscort: ActionDef<ParamsOf<"hold_escort">> = {
+  kind: "hold_escort",
+  phase: "belay",
+  validate: (ctx, m, p) => {
+    if (!ravineOf(ctx.state)) return fail("reason.ravine_only");
+    if (p.climberId === m) return fail("reason.belay_self");
+    if (!ctx.state.members[p.climberId]) return fail("reason.unknown_member");
+    if (harnessNodes(ctx.state, p.climberId).length === 0) return fail("reason.climber_not_tied_in");
+    if (!onBank(ctx, m)) return fail("reason.escort_from_bank");
+    return escortRopeFor(ctx, m, p.climberId) ? OK : fail("reason.no_rope_end_near");
+  },
+  assess: () => [],
+  apply: (tx, m, p) => {
+    const node = escortRopeFor(tx, m, p.climberId)!;
+    node.attach = { kind: "held", memberId: m };
+    node.pos = { ...posOf(tx, m) };
+    tx.emit({ type: "escort.held", severity: "info", messageKey: "event.escort_held", params: { member: m, climber: p.climberId }, refs: { members: [m, p.climberId] } });
+  },
+  duration: (ctx) => ctx.data.actions.ravine.holdEscort,
+};
+
+/** 2 carabiners and a prusik (the member's own) for a 3:1 поліспаст. */
+function pulleyItems(ctx: ReadCtx, m: MemberId): ItemState[] | null {
+  const cbs: ItemState[] = [];
+  for (let i = 0; i < ctx.data.ravine.pulleyCarabiners; i++) {
+    const cb = anyCarabiner(ctx.state, m, cbs.map((c) => c.id));
+    if (!cb) return null;
+    cbs.push(cb);
+  }
+  const cord = carried(ctx.state, m, "cord")[0];
+  return cord ? [...cbs, cord] : null;
+}
+
+/** The перила node on the start bank (the поліспаст goes there, the здьорг releases it). */
+function startAnchor(ctx: ReadCtx, ropeId: string): RopeNode | undefined {
+  const seg = gapSegmentOf(ctx.state, ropeId);
+  if (!seg) return undefined;
+  return [seg.lower, seg.upper].find((n) => bankAt(geoOf(ctx.state), n.pos.s) === "start");
+}
+
+const buildPulley: ActionDef<ParamsOf<"build_pulley">> = {
+  kind: "build_pulley",
+  phase: "build",
+  validate: (ctx, m, p) => {
+    if (!ravineOf(ctx.state)) return fail("reason.ravine_only");
+    const anchor = startAnchor(ctx, p.ropeId);
+    if (!anchor || anchor.attach.kind !== "base") return fail("reason.not_traverse");
+    if (crossingOf(ctx, p.ropeId)) return fail("reason.pulley_exists");
+    if (!ctx.data.ravine.pulleyRatios.includes(p.ratio)) return fail("reason.pulley_ratio");
+    if (!adj(ctx, posOf(ctx, m), anchor.pos)) return fail("reason.pulley_on_start_bank");
+    return pulleyItems(ctx, m) ? OK : fail("reason.pulley_needs_items");
+  },
+  assess: () => [{ key: "hint.pulley_next" }],
+  apply: (tx, m, p) => {
+    const anchor = startAnchor(tx, p.ropeId)!;
+    const items = pulleyItems(tx, m)!;
+    const c: CrossingState = {
+      ropeId: p.ropeId,
+      baseId: (anchor.attach as { baseId: string }).baseId,
+      itemIds: items.map((i) => i.id),
+      builtBy: m,
+      ratio: p.ratio,
+      tension: 0,
+      secured: false,
+      sagged: [],
+      retrieval: null,
+    };
+    tx.state.crossings = { ...crossingsOf(tx.state), [p.ropeId]: c };
+    for (const it of items) tx.setLocation(it.id, { kind: "in_use", structure: { kind: "crossing", ropeId: p.ropeId } });
+    tx.emit({ type: "pulley.built", severity: "info", messageKey: "event.pulley_built", params: { member: m, ratio: p.ratio }, refs: { members: [m], items: c.itemIds } });
+  },
+  duration: (ctx) => ctx.data.actions.ravine.buildPulley,
+};
+
+function membersOnRope(state: GameState, ropeId: string): MemberId[] {
+  return Object.values(state.attachments).filter((a) => a.target.kind === "segment" && a.target.ropeId === ropeId).map((a) => a.memberId);
+}
+
+/** Free to walk over to the поліспаст: not tied in, holding, belaying or clipped to anything. */
+function freeToWalk(state: GameState, m: MemberId): boolean {
+  return (
+    harnessNodes(state, m).length === 0 &&
+    attachmentsOf(state, m).length === 0 &&
+    belaysAsBelayer(state, m).length === 0 &&
+    !Object.values(state.ropes).some((r) => r.nodes.some((n) => n.attach.kind === "held" && n.attach.memberId === m))
+  );
+}
+
+/**
+ * «Тягнемо!» (CR-66): one command does the whole tensioning — every member within `pullRadiusM`
+ * of the поліспаст walks to it and pulls, the перила are tied off in the same moment.
+ * Needs «Два штики!» from the finish bank first (CR-67).
+ */
+function pullTogether(tx: StepTx, m: MemberId) {
+  const st = tx.state;
+  const r = tx.data.ravine;
+  for (const c of Object.values(crossingsOf(st))) {
+    const base = st.bases[c.baseId];
+    if (!base || Math.abs(st.members[m].pos.s - base.pos.s) > r.pullRadiusM) continue;
+    if (st.protocol.twoHitches === undefined) {
+      tx.emit({ type: "pulley.not_ready", severity: "warning", messageKey: "event.tension_no_two_hitches", params: { member: m }, refs: { members: [m] } });
+      tx.mistake("summary.no_two_hitches", { member: m });
+      continue;
+    }
+    if (membersOnRope(st, c.ropeId).length) {
+      tx.emit({ type: "pulley.not_ready", severity: "warning", messageKey: "event.tension_traverse_busy", params: { member: m }, refs: { members: [m] } });
+      continue;
+    }
+    const pullers: MemberId[] = [];
+    for (const mem of Object.values(st.members)) {
+      if (mem.status !== "ok" || Math.abs(mem.pos.s - base.pos.s) > r.pullRadiusM) continue;
+      const near = adj(tx, mem.pos, base.pos);
+      if (!near && !freeToWalk(st, mem.id)) continue;
+      if (!near) {
+        // walks up to the поліспаст (flat bank, no fall roll)
+        const d = mem.pos.s - base.pos.s;
+        const from = mem.pos.s;
+        mem.pos = { ...mem.pos, s: Math.round((base.pos.s + Math.sign(d) * Math.min(Math.abs(d), tx.data.rules.adjacencyM / 2)) * 100) / 100 };
+        syncMemberNodes(st, mem.id);
+        tx.emit({ type: "member.moved", severity: "info", messageKey: "event.walks_to_pulley", params: { member: mem.id, from, to: mem.pos.s }, refs: { members: [mem.id] } });
+      }
+      pullers.push(mem.id);
+    }
+    const value = pullers.length * (c.ratio ?? 3);
+    c.tension = c.secured ? Math.max(c.tension, value) : value;
+    c.secured = true;
+    const quality = tensionQuality(tx.data, c);
+    tx.emit({ type: "pulley.tensioned", severity: quality === "good" ? "info" : "warning", messageKey: "event.tensioned", params: { count: pullers.length, ratio: c.ratio ?? 3, tension: c.tension, quality }, refs: { members: pullers, items: [c.ropeId] } });
+    if (quality !== "good") tx.mistake("summary.traverse_weak", { tension: c.tension });
+  }
+}
+
+/** Take a free end of a laid-out rope and carry it (CR-65): no knot, the end follows the member. */
+const takeEnd: ActionDef<ParamsOf<"take_end">> = {
+  kind: "take_end",
+  phase: "belay",
+  validate: (ctx, m, p) => {
+    const rope = ctx.state.ropes[p.ropeId];
+    const n = rope?.nodes.find((x) => x.id === p.nodeId);
+    if (!rope || !n) return fail("reason.target_missing");
+    if (n !== rope.nodes[0] && n !== rope.nodes[rope.nodes.length - 1]) return fail("reason.not_rope_end");
+    if (n.attach.kind !== "free") return fail("reason.end_anchored");
+    if (rope.nodes.some((x) => x.attach.kind === "held" && x.attach.memberId === m)) return fail("reason.already_holding");
+    return adj(ctx, n.pos, posOf(ctx, m)) ? OK : fail("reason.not_adjacent");
+  },
+  assess: () => [],
+  apply: (tx, m, p) => {
+    const n = tx.state.ropes[p.ropeId].nodes.find((x) => x.id === p.nodeId)!;
+    n.attach = { kind: "held", memberId: m };
+    n.pos = { ...posOf(tx, m) };
+    tx.emit({ type: "rope.end_taken", severity: "info", messageKey: "event.rope_end_taken", params: { member: m }, refs: { members: [m], items: [p.ropeId] } });
+  },
+  duration: (ctx) => ctx.data.actions.ravine.takeEnd,
+};
+
+/** A rope that can pull the anchor free: carried by the member, or their супровід held on the finish bank. */
+function pullRopeOk(ctx: ReadCtx, m: MemberId, ropeId: string): boolean {
+  if (carriedRope(ctx, m, ropeId)) return true;
+  const rope = ctx.state.ropes[ropeId];
+  if (!rope || !nodeOfMember(rope, m)) return false;
+  return rope.nodes.some((n) => n.attach.kind === "held" && bankAt(geoOf(ctx.state), n.pos.s) === "finish");
+}
+
+/** Система здьоргу by the last participant (CR-57). */
+const rigRetrieval: ActionDef<ParamsOf<"rig_retrieval">> = {
+  kind: "rig_retrieval",
+  phase: "build",
+  validate: (ctx, m, p) => {
+    const c = crossingOf(ctx, p.ropeId);
+    if (!c) return fail("reason.no_pulley");
+    if (c.retrieval) return fail("reason.retrieval_exists");
+    if (!nearCrossing(ctx, m, c)) return fail("reason.not_adjacent");
+    const others = Object.values(ctx.state.members).filter((x) => x.id !== m && x.status !== "injured");
+    if (others.some((x) => !inFinish(ctx.state, x))) return fail("reason.not_last");
+    if (p.pullRopeId === p.ropeId || !pullRopeOk(ctx, m, p.pullRopeId)) return fail("reason.pull_rope_unsuitable");
+    return OK;
+  },
+  assess: () => [],
+  apply: (tx, m, p) => {
+    const c = crossingsOf(tx.state)[p.ropeId];
+    if (carriedRope(tx, m, p.pullRopeId)) {
+      tx.setLocation(p.pullRopeId, { kind: "in_use", structure: { kind: "crossing", ropeId: p.ropeId } });
+      c.itemIds.push(p.pullRopeId);
+    }
+    c.retrieval = { pullRopeId: p.pullRopeId, by: m };
+    tx.emit({ type: "retrieval.rigged", severity: "info", messageKey: "event.retrieval_rigged", params: { member: m }, refs: { members: [m], items: [p.pullRopeId] } });
+  },
+  duration: (ctx) => ctx.data.actions.ravine.rigRetrieval,
+};
+
+/** Pull the здьорг from the finish bank: the start anchor comes free, everything comes across (CR-57). */
+const retrieve: ActionDef<ParamsOf<"retrieve">> = {
+  kind: "retrieve",
+  phase: "detach",
+  validate: (ctx, m, p) => {
+    const c = crossingOf(ctx, p.ropeId);
+    if (!c || !c.retrieval) return fail("reason.no_retrieval");
+    const st = ctx.state;
+    if (Object.values(st.members).some((x) => x.status !== "injured" && !inFinish(st, x))) return fail("reason.team_not_across");
+    if (membersOnRope(st, p.ropeId).length) return fail("reason.traverse_in_use");
+    const pull = st.ropes[c.retrieval.pullRopeId];
+    const here = posOf(ctx, m);
+    if (pull) {
+      if (pull.nodes.some((n) => n.attach.kind === "member_harness" || n.attach.kind === "belay")) return fail("reason.pull_rope_tied");
+      return pull.nodes.some((n) => adj(ctx, n.pos, here)) ? OK : fail("reason.not_adjacent");
+    }
+    const finishNode = st.ropes[p.ropeId]?.nodes.find((n) => bankAt(geoOf(st), n.pos.s) === "finish");
+    return finishNode && adj(ctx, finishNode.pos, here) ? OK : fail("reason.not_adjacent");
+  },
+  assess: () => [],
+  apply: (tx, m, p) => {
+    const st = tx.state;
+    const c = crossingsOf(st)[p.ropeId];
+    const here = { ...posOf(tx, m) };
+    const base = st.bases[c.baseId];
+    const rope = st.ropes[p.ropeId];
+    const node = rope.nodes.find((n) => n.attach.kind === "base" && n.attach.baseId === c.baseId);
+    const across: string[] = [];
+    if (node && node.attach.kind === "base") {
+      if (node.attach.mode === "fixed") {
+        const knotId = node.attach.knotId;
+        for (const it of Object.values(st.items)) if (it.location.kind === "in_use" && it.location.structure.kind === "knot" && it.location.structure.knotId === knotId) {
+          tx.setLocation(it.id, { kind: "on_ground", pos: here });
+          across.push(it.id);
+        }
+        removeKnot(tx, knotId);
+      }
+      node.attach = { kind: "free" };
+      node.pos = here;
+    }
+    across.push(...c.itemIds);
+    removeCrossing(tx, c, here);
+    // the anchor sling comes too, unless something else still uses that base
+    const used =
+      base &&
+      (Object.values(st.ropes).some((r) => r.nodes.some((n) => n.attach.kind === "base" && n.attach.baseId === base.id)) ||
+        Object.values(st.attachments).some((a) => a.target.kind === "base" && a.target.baseId === base.id) ||
+        Object.values(st.belays).some((y) => y.anchor.kind === "base" && y.anchor.baseId === base.id));
+    if (base && !used) {
+      const items = itemsOnStructure(st, "base", base.id);
+      removeBase(tx, base, null);
+      for (const it of items) tx.setLocation(it.id, { kind: "on_ground", pos: here });
+      across.push(...items.map((i) => i.id));
+    }
+    tx.emit({ type: "retrieval.done", severity: "info", messageKey: "event.retrieved", params: { member: m, count: across.length }, refs: { members: [m], items: across } });
+  },
+  duration: (ctx) => ctx.data.actions.ravine.retrieve,
+};
+
 export const ACTIONS: Record<ActionKind, ActionDef<any>> = {
   skip,
   command,
@@ -1050,6 +1404,11 @@ export const ACTIONS: Record<ActionKind, ActionDef<any>> = {
   pass,
   pickup,
   wear,
+  hold_escort: holdEscort,
+  build_pulley: buildPulley,
+  take_end: takeEnd,
+  rig_retrieval: rigRetrieval,
+  retrieve,
 };
 
 export const PHASE_ORDER: ResolutionPhase[] = ["commands", "detach", "build", "attach", "belay", "movement"];

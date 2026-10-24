@@ -1,6 +1,6 @@
 // getActionOptions (§18.4.2): every action a member could take, enabled or
 // disabled with a reason. The UI fills the open parameters (knot, command, items).
-import { basePointsOf, isAdjacent } from "../geometry/hill";
+import { bankAt, basePointsOf, isAdjacent } from "../geometry/hill";
 import { anchorContext } from "../knots/instance";
 import {
   attachmentsOf,
@@ -8,15 +8,18 @@ import {
   belayableSegments,
   belaysAsBelayer,
   carried,
+  crossingsOf,
   elevationOfS,
+  gapSegmentOf,
   geoOf,
   harnessNodes,
+  ravineOf,
 } from "../model/selectors";
 import type { ActionParams, ItemId, KnotChoice, KnotContext, MemberId } from "../model/types";
 import type { ReadCtx } from "../resolution/tx";
 import { belayMode, moveReach, validateAction, type Hint } from "./defs";
 
-export type OptionGroup = "move" | "attach" | "tie" | "base" | "belay" | "command" | "detach" | "items" | "skip";
+export type OptionGroup = "move" | "attach" | "tie" | "base" | "belay" | "ravine" | "command" | "detach" | "items" | "skip";
 
 export interface ActionOption {
   id: string;
@@ -33,6 +36,37 @@ export interface ActionOption {
   reasonKey?: string;
   reasonParams?: Record<string, string | number>;
   hints?: Hint[];
+}
+
+/** The rope an option works with, if it is a rope action (CR-62: hover rope icon, rope picker). */
+export function ropeOfOption(o: Pick<ActionOption, "params">): ItemId | null {
+  const p = o.params;
+  switch (p.kind) {
+    case "tie_in":
+    case "fix_rope":
+    case "clip":
+    case "take_end":
+    case "build_pulley":
+    case "rig_retrieval":
+    case "retrieve":
+      return p.ropeId;
+    case "attach":
+      return p.target.kind === "segment" ? p.target.ropeId : null;
+    case "detach":
+      return "ropeId" in p.what ? p.what.ropeId : null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Actions of the hover rope icon (CR-62, CR-70, CR-71): everything with a rope (`ropeOfOption`),
+ * self-belay («самостраховка», any `attach`), belay («страховка») and creating / dismantling a base.
+ */
+export function isRopeAction(o: Pick<ActionOption, "params">): boolean {
+  const p = o.params;
+  if (p.kind === "make_base" || (p.kind === "detach" && p.what.kind === "dismantle_base")) return true;
+  return ropeOfOption(o) !== null || p.kind === "attach" || p.kind === "belay" || p.kind === "stop_belay" || p.kind === "hold_escort";
 }
 
 const PLACEHOLDER_KNOT: KnotChoice = { knotId: "providnyk_visimka_odnym", control: "none", turns: null };
@@ -90,6 +124,13 @@ export function getActionOptions(ctx: ReadCtx, m: MemberId): ActionOption[] {
     }
   }
 
+  // «Взяти кінець мотузки» (CR-65): a free end of a laid-out rope within reach; also the супровід (CR-56)
+  for (const rope of Object.values(st.ropes)) {
+    for (const n of [rope.nodes[0], rope.nodes[rope.nodes.length - 1]]) {
+      if (n && n.attach.kind === "free" && near(n.pos.s)) add({ id: `take_end:${n.id}`, group: "attach", labelKey: "action.take_end", labelParams: { rope: rope.ropeId }, params: { kind: "take_end", ropeId: rope.ropeId, nodeId: n.id } });
+    }
+  }
+
   // tie in / fix rope
   const ropes = new Set<string>([...carried(st, m, "rope").map((r) => r.id), ...Object.keys(st.ropes)]);
   for (const ropeId of ropes) {
@@ -135,6 +176,29 @@ export function getActionOptions(ctx: ReadCtx, m: MemberId): ActionOption[] {
   }
   for (const b of belaysAsBelayer(st, m)) add({ id: `stop_belay:${b.id}`, group: "belay", labelKey: "action.stop_belay", labelParams: { climber: b.climberId }, params: { kind: "stop_belay", belayId: b.id } });
 
+  // ravine: супровід, поліспаст, здьорг (CR-54 … CR-57)
+  if (ravineOf(st)) {
+    const geoR = geoOf(st);
+    for (const rope of Object.values(st.ropes)) {
+      const c = crossingsOf(st)[rope.ropeId];
+      if (!c) {
+        // one option per selectable ratio 1:2 / 1:3 / 1:4 (CR-61)
+        if (gapSegmentOf(st, rope.ropeId))
+          for (const ratio of ctx.data.ravine.pulleyRatios) add({ id: `pulley:${rope.ropeId}:${ratio}`, group: "ravine", labelKey: "action.build_pulley", labelParams: { rope: rope.ropeId, ratio }, params: { kind: "build_pulley", ropeId: rope.ropeId, ratio } });
+        continue;
+      }
+      if (!near(st.bases[c.baseId]?.pos.s ?? -99)) {
+        if (c.retrieval && bankAt(geoR, mem.pos.s) === "finish") add({ id: `retrieve:${rope.ropeId}`, group: "ravine", labelKey: "action.retrieve", labelParams: { rope: rope.ropeId }, params: { kind: "retrieve", ropeId: rope.ropeId } });
+        continue;
+      }
+      if (!c.retrieval) {
+        const pulls = new Set([...carried(st, m, "rope").map((r) => r.id), ...harnessNodes(st, m).map((h) => h.rope.ropeId)]);
+        pulls.delete(rope.ropeId);
+        for (const pullRopeId of pulls) add({ id: `rig:${rope.ropeId}:${pullRopeId}`, group: "ravine", labelKey: "action.rig_retrieval", labelParams: { rope: rope.ropeId, pull: pullRopeId }, params: { kind: "rig_retrieval", ropeId: rope.ropeId, pullRopeId } });
+      }
+    }
+  }
+
   // command
   add({ id: "command", group: "command", labelKey: "action.command", labelParams: {}, params: { kind: "command", command: "go", recipient: "all" }, needs: { command: true } });
 
@@ -145,8 +209,11 @@ export function getActionOptions(ctx: ReadCtx, m: MemberId): ActionOption[] {
       if (!near(n.pos.s)) continue;
       if (n.attach.kind === "member_harness" && n.attach.memberId === m) add({ id: `untie:${n.id}`, group: "detach", labelKey: "action.untie_self", labelParams: { rope: rope.ropeId }, params: { kind: "detach", what: { kind: "untie", ropeId: rope.ropeId, nodeId: n.id } } });
       if (n.attach.kind === "base" && (n.attach.mode === "fixed" || n.attach.mode === "doubled")) add({ id: `untie:${n.id}`, group: "detach", labelKey: "action.untie_base", labelParams: { rope: rope.ropeId, base: st.bases[n.attach.baseId]?.basePointId ?? "" }, params: { kind: "detach", what: { kind: "untie", ropeId: rope.ropeId, nodeId: n.id } } });
+      if (n.attach.kind === "held" && n.attach.memberId === m) add({ id: `release:${n.id}`, group: "detach", labelKey: "action.release_escort", labelParams: { rope: rope.ropeId }, params: { kind: "detach", what: { kind: "release", ropeId: rope.ropeId, nodeId: n.id } } });
       if (n.attach.kind === "base" && n.attach.mode === "running") add({ id: `unclip:${n.id}`, group: "detach", labelKey: "action.unclip", labelParams: { rope: rope.ropeId, base: st.bases[n.attach.baseId]?.basePointId ?? "" }, params: { kind: "detach", what: { kind: "unclip", ropeId: rope.ropeId, nodeId: n.id } } });
     }
+    if (ravineOf(st) && rope.nodes.some((n) => near(n.pos.s) || (n.attach.kind === "held" && n.attach.memberId === m)) && rope.nodes.some((n) => !near(n.pos.s)))
+      add({ id: `haul:${rope.ropeId}`, group: "detach", labelKey: "action.haul", labelParams: { rope: rope.ropeId }, params: { kind: "detach", what: { kind: "haul", ropeId: rope.ropeId } } });
     if (rope.nodes.some((n) => near(n.pos.s))) add({ id: `coil:${rope.ropeId}`, group: "detach", labelKey: "action.coil", labelParams: { rope: rope.ropeId }, params: { kind: "detach", what: { kind: "coil", ropeId: rope.ropeId } } });
     const ends = [rope.nodes[0], rope.nodes[rope.nodes.length - 1]];
     if (ends.some((n) => n && n.attach.kind === "free" && near(n.pos.s)) && rope.nodes.some((n) => n.attach.kind === "base" && !near(n.pos.s)))

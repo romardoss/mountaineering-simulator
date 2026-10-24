@@ -1,0 +1,13 @@
+{
+  "pulleyRatios": [2, 3, 4],
+  "pulleyCarabiners": 2,
+  "goodTension": 9,
+  "pullRadiusM": 10,
+  "traverseMoveM": 6,
+  "sagMoveFactor": 0.5,
+  "score": {
+    "base": 100,
+    "sagPoints": 5,
+    "lostItemPoints": { "rope": 20, "cord": 3, "sling": 5, "carabiner": 3, "default": 5 }
+  }
+}

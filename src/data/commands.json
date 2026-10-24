@@ -9,5 +9,7 @@
   { "key": "fixed_rope_free", "textKey": "cmd.fixed_rope_free", "hintKey": "cmd.fixed_rope_free.hint", "wrongKeys": ["cmd.wrong.fixed_rope_free.1", "cmd.wrong.fixed_rope_free.2"] },
   { "key": "rock", "textKey": "cmd.rock", "hintKey": "cmd.rock.hint", "wrongKeys": ["cmd.wrong.rock.1", "cmd.wrong.rock.2"] },
   { "key": "hold", "textKey": "cmd.hold", "hintKey": "cmd.hold.hint", "wrongKeys": ["cmd.wrong.hold.1", "cmd.wrong.hold.2"] },
-  { "key": "understood", "textKey": "cmd.understood", "hintKey": "cmd.understood.hint", "wrongKeys": ["cmd.wrong.understood.1", "cmd.wrong.understood.2"] }
+  { "key": "understood", "textKey": "cmd.understood", "hintKey": "cmd.understood.hint", "wrongKeys": ["cmd.wrong.understood.1", "cmd.wrong.understood.2"] },
+  { "key": "tension", "textKey": "cmd.tension", "hintKey": "cmd.tension.hint", "wrongKeys": ["cmd.wrong.tension.1", "cmd.wrong.tension.2"] },
+  { "key": "two_hitches", "textKey": "cmd.two_hitches", "hintKey": "cmd.two_hitches.hint", "wrongKeys": ["cmd.wrong.two_hitches.1", "cmd.wrong.two_hitches.2"] }
 ]

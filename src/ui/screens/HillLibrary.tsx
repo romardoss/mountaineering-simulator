@@ -37,7 +37,7 @@ function HillCard({ hill, season, badge, selected, onClick, children }: { hill: 
       </span>
       <small class="cfg-info">
         <span>{t("ui.cfg.hill.total", { m: round1(total) })}</span>
-        <span>{t("ui.cfg.hill.gain", { m: geo ? round1(geo.heightGain) : 0 })}</span>
+        <span>{t(hill.type === "ravine" ? "ui.cfg.hill.depth" : "ui.cfg.hill.gain", { m: geo ? round1(geo.heightGain) : 0 })}</span>
         <span>{t("ui.cfg.hill.steepest", { deg: steepest })}</span>
         <span>{t("ui.cfg.lib.base_spots", { count: basePointsOf(hill).length })}</span>
       </small>
@@ -57,11 +57,12 @@ function HillCard({ hill, season, badge, selected, onClick, children }: { hill: 
   );
 }
 
-/** Play flow step «Схил»: choose one predefined hill; no editing here. */
+/** Play flow step «Схил» / «Яр»: choose one predefined obstacle of the chosen kind; no editing here. */
 export function HillSelect() {
   const d = draft.value;
   const current = d.route.obstacles[0];
-  const hills = libraryHills();
+  const kind = current?.type ?? "hill";
+  const hills = libraryHills(kind);
   // a loaded scenario may carry a hill that is no longer in the library
   const orphan = current && !hills.some((h) => h.id === current.id) ? current : null;
   const pick = (h: HillConfig) => updateDraft((x) => ((x.route.obstacles[0] = structuredClone(h)), x));
@@ -69,12 +70,15 @@ export function HillSelect() {
     <div class="screen">
       <TopBar back="obstacle" />
       <div class="screen-body">
-        <h1>{t("ui.cfg.lib.select_title")}</h1>
+        <h1>{t(kind === "ravine" ? "ui.cfg.lib.select_title_ravine" : "ui.cfg.lib.select_title")}</h1>
         <div class="row">
-          <small class="muted">{t("ui.cfg.lib.select_hint")}</small>
-          <button class="btn small secondary" onClick={() => go("library", "hill")}>
-            {t("ui.cfg.lib.open_constructor")}
-          </button>
+          <small class="muted">{t(kind === "ravine" ? "ui.cfg.lib.select_hint_ravine" : "ui.cfg.lib.select_hint")}</small>
+          {/* the constructor makes hills only (CR-52) */}
+          {kind === "hill" && (
+            <button class="btn small secondary" onClick={() => go("library", "hill")}>
+              {t("ui.cfg.lib.open_constructor")}
+            </button>
+          )}
         </div>
         <div class="cfg-hills">
           {orphan && <HillCard hill={orphan} season={d.season} badge="scenario" selected onClick={() => undefined} />}

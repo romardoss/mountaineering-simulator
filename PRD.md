@@ -270,7 +270,7 @@ Every item has a weight. The values below are the standard weights; they are set
 
 | Type | Fields | Default weight | Notes |
 |---|---|---|---|
-| `rope` | lengthM (20–60), diameterMm fixed 10 mm, kind: `static`/`dynamic`, color | 0.07 kg per metre (≈ 2.8 kg for 40 m × 10 mm); scales with diameter | Main rope |
+| `rope` | lengthM (20–60, default 55), diameterMm fixed 10 mm, kind: `static`/`dynamic` (default `static`), color | 0.07 kg per metre (≈ 2.8 kg for 40 m × 10 mm); scales with diameter | Main rope |
 | `cord` | lengthM (1–7), diameterMm (5–8), color, preTiedKnotId? | 0.03 kg per metre | Accessory cord; may be pre-tied into a loop in configuration |
 | `sling` | lengthCm (60/120/240), color | 0.03 / 0.06 / 0.12 kg | For anchors around trees/rocks |
 | `carabiner` | locking: bool, shape: `hms` (pear) / `d` / `oval` | 0.05 (non-locking) / 0.08 (locking) kg | HMS locking required for УІАА |
@@ -400,7 +400,7 @@ Each action specification: parameters → preconditions (physical; failing ones 
 
 ### 11.4 Йти вгору (Go uphill)
 
-1. Target: **right-click a point on the hill** — the selected member goes to that point, as far as the terrain allows per step (§7.2), and keeps going on the next steps until they reach it (or something stops them, or the player gives them another action). There is no metre selection; the action list option moves as far as possible this step.
+1. Target: **right-click a point on the hill** — the selected member goes to that point, as far as the terrain allows per step (§7.2), and keeps going on the next steps until they reach it (or something stops them, or the player gives them another action). A member who stumbles or falls without injury on the way keeps going toward the same point on the next step. There is no metre selection; the action list option moves as far as possible this step.
 2. Preconditions: not attached to anything that would be overstretched:
    1. If tied into a rope whose other side is belayed or fixed, the remaining free rope length limits the distance.
    2. A grabbing knot / carabiner on a fixed rope segment cannot pass the segment's upper node (must re-attach, §11.1.3).
@@ -426,7 +426,7 @@ Each action specification: parameters → preconditions (physical; failing ones 
 ### 11.7 Подати команду (Shout a command)
 
 1. Parameters: command from `commands.json` (§12), recipient (`all` or a specific member).
-2. Preconditions: none. **A command does not use the member's step**: each member can give one command and do one action in the same step. «Страховка готова!» is available only once the belay is set up. A command can also be given from the hill view: hovering over a member shows a command button.
+2. Preconditions: none. **A command is shouted the moment it is chosen** and does not use a step: it takes effect at once (no time passes), and a member may shout any number of commands between steps while their planned action for the step stays. «Страховка готова!» is available only once the belay is set up. A command can also be given from the hill view: hovering over a member shows two icons — «Подача команди» (highlighted under the pointer) and, if the member has rope actions, a static or dynamic rope icon that opens the rope actions — rope work, self-belay, belay, creating / dismantling a base — as a grid of tiles.
 3. Effects: logged; shown as a speech bubble; evaluated by the protocol checker (§12.2); required to avoid rockfall hits (§14.4).
 4. Duration: 5 s.
 
@@ -456,6 +456,8 @@ Each action specification: parameters → preconditions (physical; failing ones 
 | `rock` | «Камінь!» | Rock! | Falling rock warning |
 | `hold` | «Закріпи!» | Take! / Hold me | Climber asks the belayer to lock the rope and hold their weight (before loading the rope or when about to fall) |
 | `understood` | «Зрозумів.» | Understood | Acknowledges that the member heard another member's instruction |
+| `tension` | «Тягнемо!» | Pull! | Ravine: everybody within 10 m of the поліспаст comes and pulls; the перила are tied off at once |
+| `two_hitches` | «Два штики!» | Two half hitches! | Ravine, finish bank: the перила are tied with a штик and hold the tension — needed before «Тягнемо!» |
 
 The list is data-driven and confirmed by the owner. There is deliberately no separate «belay off» command: the belay is removed after the climber's «Сам!».
 
@@ -969,7 +971,7 @@ Each milestone ends with a playable or testable increment and a short demo note 
 
 1. **Obstacle chains**: route = ordered list of obstacles; the finish zone of one obstacle is the start zone of the next; equipment and team state carry over; statistics per obstacle and total.
 2. **Vertical rock (Вертикальна скеля)**: configurable height; climbing with lower belay and intermediate protection; rappel (спуск по вертикальних перилах) with УІАА or device; vertical fixed ropes.
-3. **Ravine (Яр / провалля)**: Tyrolean traverse (навісна переправа) — rope tensioned between two bases (Гарда, поліспаст), crossing with carabiner and self-belay.
+3. **Ravine (Яр / провалля)** — *implemented* (specification S§9.5): the first member crosses through the ravine on belay and brings the перила; the перила are tied around the trees — a штик on the finish bank («штик навколо товстої опори» preferred, the thin-support one also correct), a карабінна удавка on the start bank; провідники are unsuitable around a tree; the team assembles a поліспаст («Зібрати поліспаст») with a chosen ratio **1:2, 1:3 or 1:4**; after «Два штики!» from the finish bank, one «Тягнемо!» brings everybody within 10 m to the поліспаст, they pull (tension = pullers × ratio) and the перила are tied off — the rope visibly takes in slack; crossings on the tensioned перила with a супровід held from a bank («Взяти кінець мотузки» — any free rope end can be taken and carried without a knot); the last member rigs a здьорг; lost gear costs points.
 4. **River (Річка)**: configurable width and water speed; wading with team belay (переправа вбрід), rope across the river, risk of being swept; wet equipment effects.
 5. **Injury handling**: first aid and evacuation instead of instant loss.
 6. **Weather and time of day**, more seasons, fatigue, backpack weight.

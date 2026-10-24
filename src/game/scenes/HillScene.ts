@@ -5,7 +5,7 @@ import type { Locale } from "../../i18n/i18n";
 import type { GameState, HillConfig, Season, Weather } from "../../engine/model/types";
 import { assetUrl, manifest } from "../assets";
 import { Timeline } from "../anim/timeline";
-import { drawRopes, drawStatic } from "../render/dynamic";
+import { drawRopes, drawStatic, hangPoint, resetSagAnimation } from "../render/dynamic";
 import { createAnimations, MemberViews, SHEETS } from "../render/members";
 import { buildTerrain, type TerrainView } from "../render/terrain";
 import { ensurePlaceholderTextures, ensureTeamPlaceholder } from "../render/textures";
@@ -27,6 +27,10 @@ export interface Bridge {
   stationAt(basePointId: string): { label: string; enabled: boolean; reason?: string; plan(): void } | null;
   /** Hover command button (CR-35): open the command dialog for a member. */
   openCommand(memberId: string): void;
+  /** Hover rope icon (CR-62): rope kind of the member's rope actions, null = no rope action. */
+  ropeIconFor(memberId: string): "static" | "dynamic" | null;
+  /** Hover rope icon (CR-62): open the action picker at the member's rope actions. */
+  openRopeActions(memberId: string): void;
 }
 
 const STATIC_ASSETS = ["terrain_grass_fill", "terrain_grass_edge", "terrain_ground_fill", "terrain_ground_edge", "terrain_rock_fill", "terrain_rock_edge", "terrain_scree_fill", "terrain_scree_edge", "tree_conifer_small", "tree_conifer_large", "tree_deciduous_small", "tree_deciduous_large", "prop_rock_outcrop", "prop_bolt", "prop_base_marker"];
@@ -42,6 +46,8 @@ export class HillScene extends Phaser.Scene {
   private goalLabels: Phaser.GameObjects.Text[] = [];
   private station: Phaser.GameObjects.GameObject[] = [];
   private cmdButton: Phaser.GameObjects.Image | null = null;
+  private ropeButton: Phaser.GameObjects.Image | null = null;
+  private ropeKind: "static" | "dynamic" | null = null;
   private cmdFor: string | null = null;
   private cmdHide: Phaser.Time.TimerEvent | null = null;
   private ropes!: Phaser.GameObjects.Graphics;
@@ -76,6 +82,7 @@ export class HillScene extends Phaser.Scene {
     this.ropes = this.add.graphics().setDepth(35);
     this.world = buildWorld(EMPTY_HILL);
     this.members = new MemberViews(this, this.world);
+    this.members.placeAt = (id, s) => this.hangAt(id, s);
     this.members.onSelect = (id) => {
       this.follow = true;
       this.bridge.setSelected(id);
@@ -130,13 +137,14 @@ export class HillScene extends Phaser.Scene {
       this.worldKey = key;
       this.timeline.skip();
       this.buildWorld(hill, s.state.scenario.season, weather);
-      bg.setSeason(s.state.scenario.season, weather);
+      bg.setSeason(s.state.scenario.season, weather, hill.type);
       this.shownState = null;
       this.shownEvents = s.lastEvents;
       this.members.sync(s.state, s.plan, true);
       this.centerOnSelected(true);
     }
-    const isNewStep = s.lastEvents !== this.shownEvents && s.prevState && s.state !== this.shownState && s.state.step > (this.shownState?.step ?? -1);
+    // a new step, or a command shouted at once between steps (same step number, CR-72)
+    const isNewStep = s.lastEvents !== this.shownEvents && s.prevState && s.state !== this.shownState && s.state.step >= (this.shownState?.step ?? -1);
     if (isNewStep && s.prevState) {
       this.shownEvents = s.lastEvents;
       this.shownState = s.state;
@@ -168,7 +176,11 @@ export class HillScene extends Phaser.Scene {
     this.drawGoals(s);
   }
 
-  /** Hover command button (CR-35): a speech bubble above the hovered member. */
+  /**
+   * Hover icons (CR-35, CR-62): «Подача команди» (speech bubble) and, when the member has rope
+   * actions, a schematic static / dynamic rope icon that opens the picker at the rope actions.
+   * Each icon is highlighted on hover; its hitbox is exactly its 16×16 image at whole pixels.
+   */
   private showCommandButton(id: string) {
     const s = this.bridge.getSession();
     if (!s || s.state.outcome !== "in_progress" || this.timeline.running) return;
@@ -176,29 +188,46 @@ export class HillScene extends Phaser.Scene {
     if (!m || m.status === "injured" || m.status === "finished") return;
     this.cmdHide?.remove();
     this.cmdHide = null;
-    ensureCommandTexture(this);
+    ensureHoverIconTextures(this);
     if (!this.cmdButton) {
-      this.cmdButton = this.add.image(0, 0, "icon_command").setDepth(45).setInteractive({ useHandCursor: true });
-      this.cmdButton.on("pointerover", () => {
-        this.cmdHide?.remove();
-        this.cmdHide = null;
-      });
-      this.cmdButton.on("pointerout", () => this.scheduleCommandHide());
-      this.cmdButton.on("pointerdown", (p: Phaser.Input.Pointer) => {
-        if (p.rightButtonDown() || !this.cmdFor) return;
-        this.bridge.openCommand(this.cmdFor);
-        this.hideCommandButton();
-      });
+      this.cmdButton = this.hoverIcon("icon_command", () => this.cmdFor && this.bridge.openCommand(this.cmdFor));
+      this.ropeButton = this.hoverIcon("icon_rope_static", () => this.cmdFor && this.bridge.openRopeActions(this.cmdFor));
     }
     this.cmdFor = id;
+    this.ropeKind = this.bridge.ropeIconFor(id);
+    if (this.ropeKind) this.ropeButton!.setTexture(`icon_rope_${this.ropeKind}`);
     this.placeCommandButton();
+  }
+
+  private hoverIcon(key: string, onClick: () => void): Phaser.GameObjects.Image {
+    const icon = this.add.image(0, 0, key).setOrigin(0.5).setDepth(45);
+    icon.setInteractive({ hitArea: new Phaser.Geom.Rectangle(0, 0, HOVER_ICON, HOVER_ICON), hitAreaCallback: Phaser.Geom.Rectangle.Contains, useHandCursor: true });
+    icon.on("pointerover", () => {
+      this.cmdHide?.remove();
+      this.cmdHide = null;
+      icon.setTexture(`${icon.texture.key.replace(/_hl$/, "")}_hl`);
+    });
+    icon.on("pointerout", () => {
+      icon.setTexture(icon.texture.key.replace(/_hl$/, ""));
+      this.scheduleCommandHide();
+    });
+    icon.on("pointerdown", (p: Phaser.Input.Pointer) => {
+      if (p.rightButtonDown()) return;
+      onClick();
+      this.hideCommandButton();
+    });
+    return icon;
   }
 
   private placeCommandButton() {
     if (!this.cmdButton || !this.cmdFor) return;
     const f = this.members.feet(this.cmdFor);
     if (!f) return this.hideCommandButton();
-    this.cmdButton.setPosition(f.x, f.y - 52).setVisible(true);
+    const x = Math.round(f.x);
+    const y = Math.round(f.y) - 52;
+    // side by side above the label; alone in the middle when there is no rope action
+    this.cmdButton.setPosition(this.ropeKind ? x - 9 : x, y).setVisible(true);
+    this.ropeButton?.setPosition(x + 9, y).setVisible(!!this.ropeKind);
   }
 
   private scheduleCommandHide() {
@@ -210,7 +239,8 @@ export class HillScene extends Phaser.Scene {
     this.cmdHide?.remove();
     this.cmdHide = null;
     this.cmdFor = null;
-    this.cmdButton?.setVisible(false);
+    this.cmdButton?.setVisible(false).setTexture("icon_command");
+    this.ropeButton?.setVisible(false);
   }
 
   /** Left-click near a base spot: station icon above it (CR-20). */
@@ -274,6 +304,7 @@ export class HillScene extends Phaser.Scene {
 
   private buildWorld(hill: HillConfig, season: Season, weather: Weather) {
     this.terrain?.destroy();
+    resetSagAnimation();
     this.world = buildWorld(hill);
     this.members.setWorld(this.world);
     this.terrain = buildTerrain(this, hill, this.world, season, weather, this.bridge.labels());
@@ -288,8 +319,15 @@ export class HillScene extends Phaser.Scene {
     this.ropes.clear();
     this.members.destroy();
     this.members = new MemberViews(this, this.world!);
+    this.members.placeAt = (id, s) => this.hangAt(id, s);
     this.members.onSelect = (id) => this.bridge.setSelected(id);
     this.timeline = new Timeline(this, this.members, () => this.world!, () => this.bridge.getLocale());
+  }
+
+  /** Members on ravine перила hang on the rope (CR-55); the state shown is the one animated towards. */
+  private hangAt(id: string, s: number) {
+    const st = this.timeline.running ? this.shownState : this.bridge.getSession()?.state;
+    return st && this.world ? hangPoint(st, this.world, id, s) : null;
   }
 
   // ---------------------------------------------------------------- camera
@@ -345,7 +383,7 @@ export class HillScene extends Phaser.Scene {
     if (this.timeline.running) this.hideCommandButton();
     else this.placeCommandButton();
     const s = this.bridge.getSession();
-    if (s) drawRopes(this.ropes, s.state, this.world, (id) => this.members.feet(id));
+    if (s) drawRopes(this.ropes, s.state, this.world, (id) => this.members.feet(id), (id) => this.members.lying(id));
     if (this.follow) this.centerOnSelected(false);
     const bg = this.scene.get("background") as BackgroundScene;
     bg.follow(this.cameras.main, this.world.height);
@@ -376,13 +414,44 @@ function ensureStationTexture(scene: Phaser.Scene) {
   g.destroy();
 }
 
-/** Hover command button (CR-35): speech bubble with «!», 14×13 px. */
-function ensureCommandTexture(scene: Phaser.Scene) {
-  if (scene.textures.exists("icon_command")) return;
-  const g = scene.make.graphics({}, false);
-  g.fillStyle(0x1a1c2c).fillRect(0, 0, 14, 10).fillRect(3, 10, 3, 3);
-  g.fillStyle(0xfff6e0).fillRect(1, 1, 12, 8).fillRect(4, 9, 1, 2);
-  g.fillStyle(0xd93636).fillRect(6, 2, 2, 4).fillRect(6, 7, 2, 1);
-  g.generateTexture("icon_command", 14, 13);
-  g.destroy();
+const HOVER_ICON = 16;
+
+/**
+ * Hover icons (CR-35, CR-62), 16×16 each with a `_hl` variant (yellow frame) shown on hover:
+ * `icon_command` speech bubble with «!»; `icon_rope_static` a straight rope with even braid ticks;
+ * `icon_rope_dynamic` a zigzag (stretchy) rope.
+ */
+function ensureHoverIconTextures(scene: Phaser.Scene) {
+  if (scene.textures.exists("icon_command_hl")) return;
+  const frame = (g: Phaser.GameObjects.Graphics, hl: boolean) => {
+    g.fillStyle(hl ? 0xffd23f : 0x1a1c2c).fillRect(0, 0, 16, 16);
+    g.fillStyle(hl ? 0xfff3c0 : 0xfff6e0).fillRect(1, 1, 14, 14);
+  };
+  const draw: Record<string, (g: Phaser.GameObjects.Graphics) => void> = {
+    icon_command: (g) => {
+      g.fillStyle(0x1a1c2c).fillRect(3, 3, 10, 7).fillRect(5, 10, 2, 2);
+      g.fillStyle(0xffffff).fillRect(4, 4, 8, 5);
+      g.fillStyle(0xd93636).fillRect(7, 4, 2, 3).fillRect(7, 8, 2, 1);
+    },
+    icon_rope_static: (g) => {
+      g.fillStyle(0x2563d9).fillRect(2, 7, 12, 3);
+      g.fillStyle(0xffffff);
+      for (let x = 3; x < 14; x += 3) g.fillRect(x, 8, 1, 1);
+      g.fillStyle(0x1a1c2c).fillRect(2, 6, 1, 5).fillRect(13, 6, 1, 5);
+    },
+    icon_rope_dynamic: (g) => {
+      g.fillStyle(0xd93636);
+      const ys = [9, 7, 5, 7, 9, 11, 9, 7, 5, 7, 9, 11];
+      ys.forEach((y, i) => g.fillRect(2 + i, y - 1, 1, 3));
+    },
+  };
+  for (const [key, fn] of Object.entries(draw)) {
+    for (const hl of [false, true]) {
+      const g = scene.make.graphics({}, false);
+      frame(g, hl);
+      fn(g);
+      g.generateTexture(hl ? `${key}_hl` : key, HOVER_ICON, HOVER_ICON);
+      g.destroy();
+    }
+  }
 }

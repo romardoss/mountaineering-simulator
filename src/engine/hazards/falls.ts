@@ -11,11 +11,13 @@ import {
   findSegment,
   geoOf,
   harnessNodes,
+  heldNodes,
   memberWeightKg,
   membersOnSegment,
   ropeUsedM,
   segmentKey,
   surfaceAt,
+  traverseAttachment,
   weightBand,
   wears,
 } from "../model/selectors";
@@ -295,6 +297,8 @@ export function resolveFall(
   st.stats.falls.total += 1;
   st.stats.members[m].falls += 1;
   tx.emit({ type: "fall.start", severity: "danger", messageKey: `event.fall.${cause}`, params: { member: m, ...params }, refs: { members: [m] } });
+  // a falling member lets go of a rope end they carried (CR-65)
+  for (const { node } of heldNodes(st, m)) node.attach = { kind: "free" };
 
   let result: FallResult | null = null;
   for (const a of attachmentsOf(st, m)) {
@@ -441,6 +445,7 @@ export function terrainFallRolls(tx: StepTx) {
   for (const [m, mv] of tx.moved) {
     if (tx.falls.some((f) => f.memberId === m)) continue;
     if (attachmentsOf(tx.state, m).some((a) => a.target.kind === "base")) continue; // self-secured at a base cannot fall
+    if (traverseAttachment(tx.state, m)) continue; // hanging on secured перила over the ravine (CR-55)
     // friction hitch on a fixed rope: safe movement below safeGrabbingMaxDeg (CR-23)
     if (usesGrabbingKnot(tx.state, m) && steepestBetween(geoOf(tx.state), mv.from, mv.to) < tx.data.rules.safeGrabbingMaxDeg) continue;
     const { p, factors, angle } = fallChance(tx, m, mv.from, mv.to);

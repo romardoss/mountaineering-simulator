@@ -1,7 +1,9 @@
 // Derived, read-only queries over GameState (ARCHITECTURE §4.2.4).
 import type { GameData } from "../data/types";
 import {
+  bankAt,
   buildHillGeometry,
+  isRavine,
   segmentAt,
   steepestBetween,
   type HillGeometry,
@@ -10,6 +12,7 @@ import type {
   Attachment,
   BaseState,
   BelayRelation,
+  CrossingState,
   GameState,
   ItemState,
   ItemType,
@@ -134,6 +137,10 @@ export function itemPos(state: GameState, it: ItemState): Position | null {
       const k = state.knots[st.knotId];
       return k ? itemPos(state, state.items[k.itemId]) : null;
     }
+    case "crossing": {
+      const c = crossingsOf(state)[st.ropeId];
+      return c ? state.bases[c.baseId]?.pos ?? null : null;
+    }
   }
 }
 
@@ -254,6 +261,13 @@ export function harnessNodes(state: GameState, memberId: MemberId): { rope: Rope
   return out;
 }
 
+/** Rope ends the member holds by hand (CR-56, CR-65). */
+export function heldNodes(state: GameState, memberId: MemberId): { rope: RopeLayout; node: RopeNode }[] {
+  const out: { rope: RopeLayout; node: RopeNode }[] = [];
+  for (const rope of Object.values(state.ropes)) for (const node of rope.nodes) if (node.attach.kind === "held" && node.attach.memberId === memberId) out.push({ rope, node });
+  return out;
+}
+
 export function belaysAsClimber(state: GameState, memberId: MemberId): BelayRelation[] {
   return Object.values(state.belays).filter((b) => b.climberId === memberId);
 }
@@ -298,4 +312,65 @@ export function isActive(m: MemberState): boolean {
 
 export function inFinish(state: GameState, m: MemberState): boolean {
   return m.pos.s >= geoOf(state, m.pos.obstacleIndex).finishStart - 1e-9;
+}
+
+// ---------------------------------------------------------------- ravine (CR-52 … CR-58)
+
+export function crossingsOf(state: GameState): Record<string, CrossingState> {
+  return state.crossings ?? {};
+}
+
+export function ravineOf(state: GameState): boolean {
+  return isRavine(state.scenario.route.obstacles[0]);
+}
+
+/** A fixed segment from one ravine bank to the other: the перила. */
+export function isGapSegment(state: GameState, seg: FixedSegment): boolean {
+  if (!ravineOf(state)) return false;
+  const geo = geoOf(state);
+  const a = bankAt(geo, seg.lower.pos.s);
+  const b = bankAt(geo, seg.upper.pos.s);
+  return !!a && !!b && a !== b;
+}
+
+export function gapSegmentOf(state: GameState, ropeId: string): FixedSegment | undefined {
+  const rope = state.ropes[ropeId];
+  return rope ? fixedSegments(state, rope).find((s) => isGapSegment(state, s)) : undefined;
+}
+
+/** The member's harness attachment (lanyard / friction hitch) to the перила, if any. */
+export function traverseAttachment(state: GameState, memberId: MemberId): (Attachment & { target: { kind: "segment"; ropeId: string } }) | undefined {
+  for (const a of attachmentsOf(state, memberId)) {
+    if (a.method === "hand" || a.target.kind !== "segment") continue;
+    const seg = findSegment(state, a.target.ropeId, a.target.lowerNodeId, a.target.upperNodeId);
+    if (seg && isGapSegment(state, seg)) return a as Attachment & { target: { kind: "segment"; ropeId: string } };
+  }
+  return undefined;
+}
+
+/** Hanging on the перila above the gap (not standing on a bank). */
+export function onTraverse(state: GameState, memberId: MemberId): boolean {
+  const m = state.members[memberId];
+  return !!traverseAttachment(state, memberId) && bankAt(geoOf(state), m.pos.s) === null;
+}
+
+/** Супровід (CR-56): tied into a rope that a member on a bank holds by hand. */
+export function escortedBy(state: GameState, memberId: MemberId): MemberId[] {
+  const geo = geoOf(state);
+  const out: MemberId[] = [];
+  for (const { rope } of harnessNodes(state, memberId)) {
+    for (const n of rope.nodes) {
+      if (n.attach.kind !== "held" || n.attach.memberId === memberId) continue;
+      const holder = state.members[n.attach.memberId];
+      if (holder && holder.status !== "injured" && bankAt(geo, holder.pos.s) && !onTraverse(state, holder.id)) out.push(holder.id);
+    }
+  }
+  return out;
+}
+
+export type TensionQuality = "none" | "weak" | "good";
+
+export function tensionQuality(data: GameData, c: CrossingState | undefined): TensionQuality {
+  if (!c || c.tension <= 0) return "none";
+  return c.tension >= data.ravine.goodTension ? "good" : "weak";
 }

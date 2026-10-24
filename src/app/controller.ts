@@ -1,7 +1,8 @@
 // GameController (ARCHITECTURE §6.2): the only caller of state-changing engine functions.
-import type { ActionParams, GameState, PlannedAction, Scenario } from "../engine/model/types";
+import type { ActionParams, GameEvent, GameState, HistoryEntry, PlannedAction, Scenario } from "../engine/model/types";
 import { geoOf, itemsWith } from "../engine/model/selectors";
 import { KEYS, load, remove, save } from "./persistence/storage";
+import { normaliseGear } from "./gear";
 import {
   animating,
   draft,
@@ -17,7 +18,7 @@ import {
 
 interface SavedGame {
   scenario: Scenario;
-  history: PlannedAction[][];
+  history: HistoryEntry[];
   state: Session["state"];
   savedAt: number;
   realTimeMs: number;
@@ -30,7 +31,7 @@ export function hasSavedGame(): boolean {
 export function startGame(config: Scenario) {
   const scenario = withWeights(config);
   const state = engine.createGame(scenario);
-  session.value = { scenario, state, history: [], plan: {}, commands: {}, goals: {}, prevState: null, lastEvents: [], startedAt: Date.now(), realTimeMs: 0 };
+  session.value = { scenario, state, history: [], plan: {}, goals: {}, prevState: null, lastEvents: [], startedAt: Date.now(), realTimeMs: 0 };
   selectedMember.value = scenario.team[0]?.id ?? null;
   autosave();
   go("game");
@@ -50,9 +51,9 @@ export function continueGame(): boolean {
     }
   }
   state = state ?? engine.replay(saved.scenario, saved.history);
-  session.value = { scenario: saved.scenario, state, history: saved.history, plan: {}, commands: {}, goals: {}, prevState: null, lastEvents: [], startedAt: Date.now(), realTimeMs: saved.realTimeMs };
+  session.value = { scenario: saved.scenario, state, history: saved.history, plan: {}, goals: {}, prevState: null, lastEvents: [], startedAt: Date.now(), realTimeMs: saved.realTimeMs };
   selectedMember.value = saved.scenario.team[0]?.id ?? null;
-  draft.value = structuredClone(saved.scenario);
+  draft.value = normaliseGear(structuredClone(saved.scenario));
   go(state.outcome === "in_progress" ? "game" : "results");
   return true;
 }
@@ -71,14 +72,11 @@ function elapsed(s: Session): number {
   return s.realTimeMs + (Date.now() - s.startedAt);
 }
 
-/** Any explicitly chosen action replaces the member's right-click goal; a command goes to its own slot (CR-37). */
+/** Any explicitly chosen action replaces the member's right-click goal; a command is shouted at once (CR-72). */
 export function setPlannedAction(memberId: string, params: ActionParams | null) {
   const s = session.value;
   if (!s) return;
-  if (params?.kind === "command") {
-    session.value = { ...s, commands: { ...s.commands, [memberId]: params } };
-    return;
-  }
+  if (params?.kind === "command") return shoutNow(memberId, params);
   const plan = { ...s.plan };
   if (params) plan[memberId] = params;
   else delete plan[memberId];
@@ -116,8 +114,11 @@ export function planMoveTo(memberId: string, targetS: number) {
   session.value = { ...s, plan, goals };
 }
 
-/** Goals that keep going next step: member ok, got closer this step, not there yet. */
-function nextGoals(prev: GameState, state: GameState, goals: Record<string, number>, executed: PlannedAction[]) {
+/**
+ * Goals that keep going next step: member ok, got closer this step, not there yet. A member who
+ * stumbled or fell without injury keeps walking to the same point next step (CR-63).
+ */
+export function nextGoals(prev: GameState, state: GameState, goals: Record<string, number>, executed: PlannedAction[], events: GameEvent[]) {
   const plan: Record<string, ActionParams> = {};
   const kept: Record<string, number> = {};
   if (state.outcome !== "in_progress") return { plan, goals: kept };
@@ -126,24 +127,33 @@ function nextGoals(prev: GameState, state: GameState, goals: Record<string, numb
     const before = Math.abs(target - prev.members[id].pos.s);
     const after = Math.abs(target - state.members[id].pos.s);
     const move = goalMove(state, id, target);
-    if (!moved || !move || state.members[id].status !== "ok" || after > before - 0.01) continue;
+    const status = state.members[id].status;
+    const fell = events.some((e) => e.type === "fall.start" && e.refs.members?.[0] === id);
+    if (!moved || !move || (status !== "ok" && status !== "fallen_caught")) continue;
+    if (!fell && (status !== "ok" || after > before - 0.01)) continue;
     plan[id] = move;
     kept[id] = target;
   }
   return { plan, goals: kept };
 }
 
-export function clearPlannedCommand(memberId: string) {
+/**
+ * A command is shouted the moment it is chosen (CR-72): resolved right away, logged and animated,
+ * not a step and no time. The planned actions stay; they are validated again at «Виконати крок».
+ */
+export function shoutNow(memberId: string, params: ActionParams) {
   const s = session.value;
-  if (!s) return;
-  const commands = { ...s.commands };
-  delete commands[memberId];
-  session.value = { ...s, commands };
+  if (!s || animating.value || s.state.outcome !== "in_progress" || params.kind !== "command") return;
+  const res = engine.shout(s.state, memberId, params, { checkInvariants: !!import.meta.env?.DEV });
+  if (!res.events.length) return;
+  session.value = { ...s, prevState: s.state, state: res.state, lastEvents: res.events, history: [...s.history, { shout: { memberId, params } }] };
+  animating.value = true;
+  autosave();
 }
 
-/** Commands first, then main actions (one of each per member). */
+/** The main actions planned for the step (commands are shouted at once, CR-72). */
 export function planList(s: Session): PlannedAction[] {
-  return [...Object.entries(s.commands ?? {}), ...Object.entries(s.plan)].map(([memberId, params]) => ({ memberId, params }));
+  return Object.entries(s.plan).map(([memberId, params]) => ({ memberId, params }));
 }
 
 export function executeStep() {
@@ -152,14 +162,22 @@ export function executeStep() {
   const plan = planList(s);
   const v = engine.validatePlan(s.state, plan);
   // impossible actions cannot be confirmed (§10.1.2): drop them to skip
-  const valid = plan.filter((p) => (p.params.kind === "command" ? v.commands : v.members)[p.memberId]?.ok);
+  const valid = plan.filter((p) => v.members[p.memberId]?.ok);
   const res = engine.resolveStep(s.state, valid, { checkInvariants: !!import.meta.env?.DEV });
-  const carry = nextGoals(s.state, res.state, s.goals, valid);
-  const next: Session = { ...s, prevState: s.state, state: res.state, lastEvents: res.events, history: [...s.history, valid], plan: carry.plan, commands: {}, goals: carry.goals };
+  const carry = nextGoals(s.state, res.state, s.goals, valid, res.events);
+  const next: Session = { ...s, prevState: s.state, state: res.state, lastEvents: res.events, history: [...s.history, valid], plan: carry.plan, goals: carry.goals };
   session.value = next;
   animating.value = res.events.some((e) => e.type !== "step.done");
   autosave();
   if (res.state.outcome !== "in_progress") finish();
+}
+
+/** Ravine (CR-58): the whole team is across → end the level (won, or completed with penalties). */
+export function finishLevel() {
+  const s = session.value;
+  if (!s || animating.value || !engine.canFinishLevel(s.state)) return;
+  session.value = { ...s, state: engine.finishLevel(s.state) };
+  finish();
 }
 
 export function giveUp() {
@@ -201,7 +219,7 @@ export function replaySameScenario() {
 
 export function editScenario() {
   const s = session.value;
-  if (s) draft.value = structuredClone(s.scenario);
+  if (s) draft.value = normaliseGear(structuredClone(s.scenario));
   go("hill");
 }
 

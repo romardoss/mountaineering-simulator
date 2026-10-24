@@ -1,6 +1,7 @@
-// Вибір перешкоди (§6.1.2). Only the hill is playable in MVP.
+// Вибір перешкоди (§6.1.2). Hill and ravine are playable (CR-52); rock and river come later.
 import { t } from "../../i18n/i18n";
-import { go } from "../../app/store";
+import { draft, go, updateDraft } from "../../app/store";
+import { hillPresets, ravinePresets } from "../../data/load";
 import { TopBar } from "../components/common";
 import { FlowNav } from "./cfgShared";
 
@@ -60,8 +61,19 @@ function Illustration({ kind }: { kind: Kind }) {
   }
 }
 
+/** Switching the obstacle kind picks that kind's default preset; the same kind keeps the choice. */
+function choose(kind: "hill" | "ravine") {
+  const cur = draft.value.route.obstacles[0];
+  if ((cur?.type ?? "hill") !== kind) {
+    const first = (kind === "ravine" ? ravinePresets : hillPresets)[0];
+    updateDraft((x) => ((x.route.obstacles[0] = structuredClone(first)), x));
+  }
+  go("hill");
+}
+
 export function ObstacleSelect() {
   const kinds: Kind[] = ["hill", "rock", "ravine", "river"];
+  const current = draft.value.route.obstacles[0]?.type ?? "hill";
   return (
     <div class="screen">
       <TopBar back="menu" />
@@ -69,9 +81,9 @@ export function ObstacleSelect() {
         <h1>{t("ui.cfg.obstacle.title")}</h1>
         <div class="cfg-cards">
           {kinds.map((k) => {
-            const active = k === "hill";
+            const active = k === "hill" || k === "ravine";
             return (
-              <button class="panel cfg-obstacle" disabled={!active} onClick={() => active && go("hill")} aria-label={t(`ui.cfg.obstacle.${k}`)}>
+              <button class={`panel cfg-obstacle ${active && current === k ? "sel" : ""}`} disabled={!active} aria-pressed={active && current === k} onClick={() => active && choose(k)} aria-label={t(`ui.cfg.obstacle.${k}`)}>
                 <Illustration kind={k} />
                 <h2>{t(`ui.cfg.obstacle.${k}`)}</h2>
                 <p>{t(`ui.cfg.obstacle.${k}.desc`)}</p>

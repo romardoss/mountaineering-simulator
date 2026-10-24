@@ -1,8 +1,9 @@
 // Game screen (§18.4): hill view, journal, member cards, step controls.
 import { useEffect, useRef, useState } from "preact/hooks";
 import { t } from "../../i18n/i18n";
-import { animating, baseConfirm, commandDialogFor, engine, go, selectedMember, session } from "../../app/store";
-import { executeStep, giveUp, planList, setPlannedAction } from "../../app/controller";
+import { animating, baseConfirm, commandDialogFor, engine, go, ropePickerFor, selectedMember, session } from "../../app/store";
+import { executeStep, finishLevel, giveUp, planList, setPlannedAction } from "../../app/controller";
+import { crossingsOf, tensionQuality } from "../../engine/model/selectors";
 import { mountHillView } from "../../game";
 import { TopBar } from "../components/common";
 import { Journal } from "../panels/Journal";
@@ -34,7 +35,7 @@ export function GameScreen() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (picker || confirmGiveUp || commandDialogFor.value || baseConfirm.value) return;
+      if (picker || confirmGiveUp || commandDialogFor.value || ropePickerFor.value || baseConfirm.value) return;
       const target = e.target as HTMLElement;
       if (target && ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName)) return;
       const cur = session.value;
@@ -65,6 +66,8 @@ export function GameScreen() {
   const v = engine.validatePlan(s.state, planList(s));
   const plannedS = Math.max(engine.data.rules.minStepSeconds, ...Object.values(v.members).map((m) => m.durationS), 0);
   const over = s.state.outcome !== "in_progress";
+  const canFinish = engine.canFinishLevel(s.state);
+  const crossings = Object.values(crossingsOf(s.state));
 
   return (
     <div class="game-screen">
@@ -73,6 +76,11 @@ export function GameScreen() {
         <span class="chip">{t(`season.${s.scenario.season}`)}</span>
         <span class="chip" title={t("ui.game.weather")}>{t(`weather.${s.state.weather ?? "dry"}`)}</span>
         <span class="chip">{t(`mode.${s.scenario.mode}`)}</span>
+        {crossings.map((c) => (
+          <span class="chip" title={t("ui.game.perila_hint")}>
+            {t("ui.game.perila", { ratio: c.ratio ?? 3, tension: c.tension, quality: t(`tension.${tensionQuality(engine.data, c)}`), secured: c.secured ? "yes" : "no" })}
+          </span>
+        ))}
         <button class="btn small secondary" onClick={() => go("glossary", "game")}>
           {t("ui.game.glossary")}
         </button>
@@ -98,11 +106,17 @@ export function GameScreen() {
           <button class="btn big" disabled={animating.value || over} onClick={() => executeStep()}>
             {t("ui.game.execute")} <span class="kbd">Enter</span>
           </button>
+          {canFinish && (
+            <button class="btn" disabled={animating.value} title={t("ui.game.finish_level_hint")} onClick={() => finishLevel()}>
+              {t("ui.game.finish_level")}
+            </button>
+          )}
           <span class="step-info">{t("ui.game.keys_help")}</span>
           <span class="step-info">{t("ui.game.right_click_hint")}</span>
         </div>
       </div>
       {picker && <ActionPicker memberId={picker} onClose={() => setPicker(null)} />}
+      {ropePickerFor.value && <ActionPicker memberId={ropePickerFor.value} ropeOnly onClose={() => (ropePickerFor.value = null)} />}
       {commandDialogFor.value && (
         <CommandDialog
           memberId={commandDialogFor.value}

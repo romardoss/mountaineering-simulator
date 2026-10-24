@@ -8,7 +8,10 @@ test("configure the default preset, play steps, switch language", async ({ page 
   await page.getByRole("button", { name: "Грати" }).click();
   await page.getByRole("button", { name: "Схил", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Вибір схилу" })).toBeVisible();
-  await page.getByRole("button", { name: /Схил з деревами/ }).click();
+  // CR-48: only three predefined hills
+  for (const gone of [/Схил з деревами/, /Пологий трав'янистий схил/, /Спуск зі схилу/]) await expect(page.getByRole("button", { name: gone })).toHaveCount(0);
+  for (const kept of [/Скельно-осипний схил/, /Через вершину/, /Осінній Лист 2026/]) await expect(page.getByRole("button", { name: kept })).toBeVisible();
+  await page.getByRole("button", { name: /Скельно-осипний схил/ }).click();
   for (let i = 0; i < 6; i++) {
     const start = page.getByRole("button", { name: /Почати|Старт/ }).first();
     if (await start.isVisible().catch(() => false)) break;
@@ -44,6 +47,36 @@ test("obstacle constructor: a copied hill appears in the play list", async ({ pa
   await page.getByRole("button", { name: "Грати" }).click();
   await page.getByRole("button", { name: "Схил", exact: true }).click();
   await expect(page.getByRole("button", { name: /Мій тестовий схил/ })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("ravine: choose «Яр», gear options, start and play a step", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Грати" }).click();
+  await page.getByRole("button", { name: "Яр", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Вибір яру" })).toBeVisible();
+  await page.getByRole("button", { name: /Скельний яр/ }).click();
+  for (let i = 0; i < 6; i++) {
+    if (await page.getByRole("heading", { name: "Спорядження" }).isVisible().catch(() => false)) break;
+    await page.getByRole("button", { name: /Далі/ }).first().click();
+  }
+  // CR-49 / CR-51: slings 120 / 240 cm only, no locking checkbox; CR-50: 55 m ropes
+  await expect(page.locator("option", { hasText: "60 см" })).toHaveCount(0);
+  await expect(page.getByRole("checkbox", { name: /муфт/ })).toHaveCount(0);
+  await expect(page.getByText(/мотузка 55 м/i).first()).toBeVisible();
+  // CR-60: static by default, the choice stays
+  await expect(page.getByLabel(/Тип мотузки/).first()).toHaveValue("static");
+  for (let i = 0; i < 6; i++) {
+    const start = page.getByRole("button", { name: /Почати|Старт/ }).first();
+    if (await start.isVisible().catch(() => false)) break;
+    await page.getByRole("button", { name: /Далі/ }).first().click();
+  }
+  await page.getByRole("button", { name: /Почати|Старт/ }).first().click();
+  await expect(page.getByRole("button", { name: /Виконати крок/ })).toBeVisible();
+  await page.getByRole("button", { name: /Виконати крок/ }).click();
+  await page.waitForTimeout(300);
   expect(errors).toEqual([]);
 });
 

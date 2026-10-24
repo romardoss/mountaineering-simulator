@@ -19,6 +19,7 @@ This is the contract the code relies on (PRD §18.5.3). It follows `docs/ASSET_P
 | Group | id | Size (px) | Frames | Notes |
 |---|---|---|---|---|
 | art | `art_key_art` | 480×270 | — | menu background ✅ |
+| art | `art_ravine_bg` | 640×360 | — | ravine background (CR-52), from `raw/art/Піксельна панорама гірської долини.png` ✅ |
 | art | `art_logo_emblem`, `art_obstacle_{hill,rock,ravine,river}` | 128×64, 96×64 | — | ⏳ not yet generated (CSS/SVG placeholders) |
 | characters | `team_<anim>` | 32·N × 224 | N per row | **Δ 32×32 cells** (7 rows = members 1–7), pivot (16,31), facing right |
 | characters | `team_idle` 4, `team_walk_up` 6, `team_walk_down` 6, `team_climb` 6 | | | ⏳ missing: idle/walk use `team_tie_knot` frame 0 + bob |
@@ -32,7 +33,7 @@ This is the contract the code relies on (PRD §18.5.3). It follows `docs/ASSET_P
 | decor | `decor` | 128×16 | 8 | ⏳ |
 | backgrounds | `bg_sky` 480×270, `bg_far` / `bg_mid` / `bg_near` 960×270 | | | ⏳ programmatic parallax |
 | icons | `icon_*` (equipment) 16×16 | | | ⏳ text labels |
-| icons | knot icons | | | **Δ none** — knot names are shown as text |
+| icons | `knot_<id>` (`icons/knots/`, = `knots.json` `icon`) | variable, ≤ 200×82 | — | ✅ 18 of 24, transparent, 200-px logical grid; `*_odnym` = base knot + red cross on one end; shown in the knot dialog and the knot reference. ⏳ missing `tkatskyi`, `zustrichnyi`, `shtyk`, `shtyk_tonka`, `shtyk_tovsta`, `karabinna_udavka` (name only) |
 | ui | `ui_*` | see prompts | | ⏳ CSS styling |
 
 ## 4. Manifest format

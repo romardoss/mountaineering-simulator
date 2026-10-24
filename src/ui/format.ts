@@ -34,6 +34,7 @@ export function localizeParams(state: GameState | null, params: Record<string, u
   if (typeof out.context === "string") out.context = t(`context.${String(out.context).toLowerCase()}`);
   if (typeof out.action === "string") out.action = t(`actionkind.${out.action}`);
   if (typeof out.anchor === "string") out.anchor = t(`anchor.${out.anchor}`);
+  if (typeof out.quality === "string") out.quality = t(`tension.${out.quality}`);
   if (out.recipient === "all") out.recipient = t("ui.everyone");
   else if (typeof out.recipient === "string") out.recipient = memberName(state, out.recipient);
   if (typeof out.target === "string" && (out.target === "segment" || out.target === "base")) out.target = t(`target.${out.target}`);

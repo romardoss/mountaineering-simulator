@@ -1,8 +1,9 @@
 // Bottom panel: one card per member (§18.4.2).
 import { t } from "../../i18n/i18n";
 import { data, engine, selectedMember, session } from "../../app/store";
-import { clearPlannedCommand, planList } from "../../app/controller";
+import { planList } from "../../app/controller";
 import { angleAt, zoneAt } from "../../engine/geometry/hill";
+import { onTraverse } from "../../engine/model/selectors";
 import { attachmentsOf, belaysAsBelayer, belaysAsClimber, geoOf, harnessNodes, itemsWith, memberWeightKg } from "../../engine/model/selectors";
 import type { GameState, ItemState, MemberState } from "../../engine/model/types";
 import { isIndividual } from "../../engine/scenario/kit";
@@ -49,8 +50,6 @@ export function MemberCards({ onOpen }: { onOpen: (memberId: string) => void }) 
         const own = itemsWith(state, m.id, ["worn", "carried"]);
         const team = own.filter((it) => !isIndividual(data, it.type));
         const individual = own.filter((it) => isIndividual(data, it.type));
-        const command = s.commands?.[m.id];
-        const cv = v.commands?.[m.id];
         const disabled = m.status === "injured" || m.status === "finished";
         return (
           <div
@@ -78,7 +77,7 @@ export function MemberCards({ onOpen }: { onOpen: (memberId: string) => void }) 
                 </span>
                 {m.status !== "ok" && <span class={`status-${m.status}`}>{t(`status.${m.status}`)}</span>}
                 <span class="meta">
-                  {t("ui.game.position", { s: Math.round(m.pos.s * 10) / 10, angle: angleAt(geo, m.pos.s) })} · {t(`zone.${zoneAt(geo, m.pos.s)}`)}
+                  {t("ui.game.position", { s: Math.round(m.pos.s * 10) / 10, angle: angleAt(geo, m.pos.s) })} · {onTraverse(s.state, m.id) ? t("ui.game.on_perila") : t(`zone.${zoneAt(geo, m.pos.s)}`)}
                 </span>
               </div>
             </div>
@@ -101,15 +100,6 @@ export function MemberCards({ onOpen }: { onOpen: (memberId: string) => void }) 
               {planned && pv && !pv.ok && pv.reasonKey && <div class="hint-line" style={{ color: "var(--danger)" }}>{formatKey(state, pv.reasonKey, pv.reasonParams)}</div>}
               {learning && planned && pv?.ok && pv.hints.map((h) => <div class="hint-line">⚠ {formatKey(state, h.key, h.params)}</div>)}
             </div>
-            {command && (
-              <div class={`action command ${cv && !cv.ok ? "invalid" : ""}`}>
-                {actionLabel(state, command)}
-                <button class="btn-ghost" aria-label={t("ui.game.remove_command")} title={t("ui.game.remove_command")} onClick={(e) => (e.stopPropagation(), clearPlannedCommand(m.id))}>
-                  ✕
-                </button>
-                {cv && !cv.ok && cv.reasonKey && <div class="hint-line" style={{ color: "var(--danger)" }}>{formatKey(state, cv.reasonKey, cv.reasonParams)}</div>}
-              </div>
-            )}
           </div>
         );
       })}

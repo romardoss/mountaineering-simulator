@@ -130,5 +130,62 @@
       "zustrichna_visimka": "acceptable"
     },
     "default": "wrong"
+  },
+  "PERILA_FINISH": {
+    "nameKey": "context.perila_finish",
+    "ratings": {
+      "shtyk_tovsta": "correct",
+      "shtyk_tonka": {
+        "rating": "correct",
+        "messageKey": "knot.msg.prefer_shtyk_tovsta"
+      },
+      "shtyk": "acceptable",
+      "bulin": "acceptable",
+      "karabinna_udavka": "acceptable",
+      "providnyk_visimka": {
+        "rating": "wrong",
+        "messageKey": "knot.msg.loop_not_around_tree"
+      },
+      "providnyk_visimka_odnym": {
+        "rating": "wrong",
+        "messageKey": "knot.msg.loop_not_around_tree"
+      },
+      "serednii_providnyk": {
+        "rating": "wrong",
+        "messageKey": "knot.msg.loop_not_around_tree"
+      },
+      "podviinyi_providnyk": {
+        "rating": "wrong",
+        "messageKey": "knot.msg.loop_not_around_tree"
+      }
+    },
+    "default": "wrong"
+  },
+  "PERILA_START": {
+    "nameKey": "context.perila_start",
+    "ratings": {
+      "karabinna_udavka": "correct",
+      "shtyk_tovsta": "acceptable",
+      "shtyk_tonka": "acceptable",
+      "shtyk": "acceptable",
+      "bulin": "acceptable",
+      "providnyk_visimka": {
+        "rating": "wrong",
+        "messageKey": "knot.msg.loop_not_around_tree"
+      },
+      "providnyk_visimka_odnym": {
+        "rating": "wrong",
+        "messageKey": "knot.msg.loop_not_around_tree"
+      },
+      "serednii_providnyk": {
+        "rating": "wrong",
+        "messageKey": "knot.msg.loop_not_around_tree"
+      },
+      "podviinyi_providnyk": {
+        "rating": "wrong",
+        "messageKey": "knot.msg.loop_not_around_tree"
+      }
+    },
+    "default": "wrong"
   }
 }

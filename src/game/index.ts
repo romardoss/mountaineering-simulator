@@ -2,7 +2,9 @@
 // Internal resolution 480×270, integer-scaled (settings.pixelScale or auto, §18.1.2).
 import Phaser from "phaser";
 import { effect } from "@preact/signals";
-import { animating, baseConfirm, commandDialogFor, engine, selectedMember, session } from "../app/store";
+import { animating, baseConfirm, commandDialogFor, engine, ropePickerFor, selectedMember, session } from "../app/store";
+import { isRopeAction, ropeOfOption } from "../engine/actions/options";
+import { harnessNodes } from "../engine/model/selectors";
 import { settings } from "../app/settings";
 import { baseMissing, planMoveTo, setPlannedAction } from "../app/controller";
 import { locale, t } from "../i18n/i18n";
@@ -118,6 +120,30 @@ export function mountHillView(container: HTMLElement): () => void {
       if (!m || m.status === "injured" || m.status === "finished") return;
       selectedMember.value = id;
       commandDialogFor.value = id;
+    },
+    ropeIconFor: (id) => {
+      const s = session.peek();
+      if (!s || s.state.outcome !== "in_progress") return null;
+      const m = s.state.members[id];
+      if (!m || m.status === "injured" || m.status === "finished") return null;
+      // the member's own rope first (tied in, held, carried), else the first rope they can act on
+      const opts = engine.getActionOptions(s.state, id).filter(isRopeAction);
+      if (!opts.length) return null;
+      // a belay works with the climber's rope (CR-70)
+      const climberRope = (o: (typeof opts)[number]) => (o.params.kind === "belay" ? harnessNodes(s.state, o.params.climberId)[0]?.rope.ropeId ?? null : null);
+      const ropes = opts.map((o) => ropeOfOption(o) ?? climberRope(o)).filter((r): r is string => !!r);
+      if (!ropes.length) ropes.push(...Object.keys(s.state.ropes)); // self-belay at a base only: any rope in play
+      const own = ropes.find((r) => {
+        const it = s.state.items[r];
+        return (it?.location.kind === "carried" && it.location.memberId === id) || s.state.ropes[r]?.nodes.some((n) => "memberId" in n.attach && n.attach.memberId === id);
+      });
+      return s.state.items[own ?? ropes[0]]?.props.kind === "dynamic" ? "dynamic" : "static";
+    },
+    openRopeActions: (id) => {
+      const s = session.peek();
+      if (!s || s.state.outcome !== "in_progress" || animating.peek()) return;
+      selectedMember.value = id;
+      ropePickerFor.value = id;
     },
   };
 

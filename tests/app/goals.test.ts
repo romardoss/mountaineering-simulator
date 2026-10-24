@@ -2,7 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { animating, session } from "../../src/app/store";
 import { executeStep, planMoveTo, setPlannedAction, startGame } from "../../src/app/controller";
-import { flatHill, scenario } from "../engine/dsl";
+import { Game, flatHill, mv, scenario, steepHill } from "../engine/dsl";
+import { nextGoals } from "../../src/app/controller";
 
 function step() {
   executeStep();
@@ -31,17 +32,40 @@ describe("CR-18 right-click goal", () => {
   });
 });
 
-describe("CR-37 command slot", () => {
-  it("a command does not replace the planned action and both are sent", async () => {
+describe("CR-63 goal after a fall", () => {
+  it("a member who fell without injury keeps walking to the same point", () => {
+    const g = new Game(scenario({ hill: steepHill(30, "ground"), n: 2 }));
+    g.step({ m1: mv(3) });
+    const prev = g.state;
+    const plan = [{ memberId: "m1", params: { kind: "move" as const, toward: "finish" as const, distanceM: 20, targetS: 30 } }];
+    const events = g.step({ m1: plan[0].params }, { "fall:terrain:m1": true, "injury:*": false });
+    expect(events.some((e) => e.type === "fall.start")).toBe(true);
+    expect(g.state.members.m1.status).not.toBe("injured");
+    const next = nextGoals(prev, g.state, { m1: 30 }, plan, events);
+    expect(next.goals.m1).toBe(30);
+    expect(next.plan.m1).toMatchObject({ kind: "move", toward: "finish", targetS: 30 });
+  });
+});
+
+describe("CR-72 commands are shouted at once", () => {
+  it("a chosen command is shouted right away: no step, no time, the planned action stays", async () => {
     const { planList } = await import("../../src/app/controller");
+    const { engine } = await import("../../src/app/store");
     startGame(scenario({ hill: flatHill(), n: 2 }));
     planMoveTo("m1", 12);
+    const before = session.value!.state;
     setPlannedAction("m1", { kind: "command", command: "understood", recipient: "all" });
+    animating.value = false;
+    const after = session.value!.state;
+    expect(after.step).toBe(before.step);
+    expect(after.simTimeS).toBe(before.simTimeS);
+    expect(after.protocol.recent.some((c) => c.command === "understood" && c.memberId === "m1")).toBe(true);
     expect(session.value!.plan.m1.kind).toBe("move");
-    expect(session.value!.goals.m1).toBe(12);
-    expect(planList(session.value!).filter((p) => p.memberId === "m1").map((p) => p.params.kind).sort()).toEqual(["command", "move"]);
+    expect(planList(session.value!).map((p) => p.params.kind)).toEqual(["move"]);
     step();
-    expect(session.value!.commands).toEqual({});
-    expect(session.value!.state.protocol.recent.some((c) => c.command === "understood")).toBe(true);
+    expect(session.value!.state.step).toBe(1);
+    expect(session.value!.state.stats.members.m1.activeSteps).toBe(1);
+    // the history replays the shout and the step to the same state
+    expect(JSON.stringify(engine.replay(session.value!.scenario, session.value!.history))).toBe(JSON.stringify(session.value!.state));
   });
 });

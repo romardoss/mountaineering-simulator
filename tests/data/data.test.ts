@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { IntlMessageFormat } from "intl-messageformat";
-import { gameData, hillPresets, kits } from "../../src/data/load";
+import { gameData, obstaclePresets as hillPresets, kits } from "../../src/data/load";
 import { validateHill } from "../../src/engine/scenario/validate";
 import { buildKit, isIndividual } from "../../src/engine/scenario/kit";
 import { team } from "../engine/dsl";

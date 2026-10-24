@@ -67,13 +67,15 @@
         "id": { "type": "string" },
         "nameKey": { "type": "string" },
         "name": { "type": "string" },
-        "type": { "const": "hill" },
-        "routeType": { "enum": ["ascent", "descent", "ascent_descent"] },
+        "type": { "enum": ["hill", "ravine"] },
+        "routeType": { "enum": ["ascent", "descent", "ascent_descent", "descent_ascent"] },
         "startZoneM": { "type": "number", "minimum": 0 },
         "finishZoneM": { "type": "number", "minimum": 0 },
         "summitZoneM": { "type": "number", "minimum": 0 },
         "sections": { "type": "array", "items": { "$ref": "#/definitions/section" } },
         "descentSections": { "type": "array", "items": { "$ref": "#/definitions/section" } },
+        "bottomZoneM": { "type": "number", "minimum": 0 },
+        "ascentSections": { "type": "array", "items": { "$ref": "#/definitions/section" } },
         "trees": { "type": "array", "items": { "$ref": "#/definitions/tree" } },
         "basePoints": { "type": "array", "items": { "$ref": "#/definitions/basePoint" } }
       }

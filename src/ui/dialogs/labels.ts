@@ -20,6 +20,7 @@ export function labelParams(state: GameState, params: Record<string, string | nu
   const out: Record<string, unknown> = { ...params };
   for (const k of ["climber", "to"]) if (typeof out[k] === "string") out[k] = memberName(state, out[k]);
   if (typeof out.rope === "string") out.rope = ropeLabel(state, out.rope);
+  if (typeof out.pull === "string") out.pull = ropeLabel(state, out.pull);
   if (typeof out.base === "string") out.base = baseLabel(state, out.base);
   if (typeof out.item === "string") out.item = t(`item.${out.item}`);
   if (typeof out.anchor === "string") out.anchor = t(`anchor.${out.anchor === "tree" ? "tree_large" : out.anchor}`);
@@ -59,6 +60,8 @@ export function actionLabel(state: GameState, p: ActionParams): string {
       return `${base} → ${memberName(state, p.toMemberId)} (${p.itemIds.length})`;
     case "pickup":
       return `${base} (${p.itemIds.length})`;
+    case "build_pulley":
+      return `${base} 1:${p.ratio}`;
     default:
       return base;
   }

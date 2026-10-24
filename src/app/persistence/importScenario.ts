@@ -3,6 +3,7 @@ import Ajv from "ajv";
 import schema from "../../data/schemas/scenario.schema.json";
 import type { ItemConfig, Scenario } from "../../engine/model/types";
 import { withWeights } from "../store";
+import { normaliseGear } from "../gear";
 import { isIndividual } from "../../engine/scenario/kit";
 import { gameData } from "../../data/load";
 
@@ -23,7 +24,8 @@ export function validateScenarioJson(x: unknown): ImportResult {
       const { baseWeightKg: _legacy, ...rest } = props as typeof props & { baseWeightKg?: number };
       return { id, type, props: rest, assignedTo };
     });
-    const scenario = withWeights({ ...x, team: x.team.map(({ id, name, appearance }) => ({ id, name, appearance })), items });
+    // no 60 cm slings, locking carabiners only (CR-49, CR-51)
+    const scenario = normaliseGear(withWeights({ ...x, team: x.team.map(({ id, name, appearance }) => ({ id, name, appearance })), items }));
     return { ok: true, scenario, errors: [] };
   }
   const errors = (validate.errors ?? []).map((e) => `${e.instancePath || "/"} ${e.message ?? ""}`.trim());

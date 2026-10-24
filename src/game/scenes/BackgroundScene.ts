@@ -1,8 +1,13 @@
-// Parallax background (§18.2.1–2). No background art exists yet, so sky and
-// mountain layers are drawn programmatically (palette from docs/ASSET_PROMPTS.md).
+// Parallax background (§18.2.1–2). Hills: sky and mountain layers drawn programmatically
+// (palette from docs/ASSET_PROMPTS.md). Ravines: the painted panorama `art_ravine_bg` (CR-52).
 // Runs in its own scene so the hill camera zoom does not scale the sky.
 import Phaser from "phaser";
-import type { Season, Weather } from "../../engine/model/types";
+import type { ObstacleType, Season, Weather } from "../../engine/model/types";
+import { assetUrl } from "../assets";
+
+const RAVINE_BG = "art_ravine_bg";
+/** Season / weather tint of the ravine panorama (summer art). */
+const RAVINE_TINT: Record<Season, number> = { spring: 0xf2fff0, summer: 0xffffff, autumn: 0xf7d9a8, winter: 0xdfe8f5 };
 
 export let VIEW_W = 480;
 export let VIEW_H = 270;
@@ -82,6 +87,8 @@ function ridge(seed: number, base: number, amp: number, peaks: number): (x: numb
 export class BackgroundScene extends Phaser.Scene {
   private season: Season = "summer";
   private weather: Weather = "dry";
+  private kind: ObstacleType = "hill";
+  private panorama: Phaser.GameObjects.Image | null = null;
   private layers: { sprite: Phaser.GameObjects.TileSprite; factor: number; baseY: number }[] = [];
   private flakes: { o: Phaser.GameObjects.Rectangle; vx: number; vy: number }[] = [];
   private clouds: Phaser.GameObjects.Image[] = [];
@@ -91,14 +98,20 @@ export class BackgroundScene extends Phaser.Scene {
     super({ key: "background", active: true });
   }
 
+  preload() {
+    const url = assetUrl(RAVINE_BG);
+    if (url) this.load.image(RAVINE_BG, url);
+  }
+
   create() {
     this.build(this.season, this.weather);
   }
 
-  setSeason(season: Season, weather: Weather = "dry") {
-    if (season === this.season && weather === this.weather && this.layers.length) return;
+  setSeason(season: Season, weather: Weather = "dry", kind: ObstacleType = "hill") {
+    if (season === this.season && weather === this.weather && kind === this.kind && (this.layers.length || this.panorama)) return;
     this.season = season;
     this.weather = weather;
+    this.kind = kind;
     if (this.sys.isActive()) this.build(season, weather);
   }
 
@@ -107,7 +120,19 @@ export class BackgroundScene extends Phaser.Scene {
     this.layers = [];
     this.flakes = [];
     this.clouds = [];
+    this.panorama = null;
     const rain = weather === "rain";
+    if (this.kind === "ravine" && this.textures.exists(RAVINE_BG)) {
+      // painted gorge between two banks, a little wider than the view for a slow parallax
+      const img = this.add.image(0, 0, RAVINE_BG).setOrigin(0).setScrollFactor(0);
+      const scale = Math.max((VIEW_W + 48) / img.width, (VIEW_H + PARALLAX_PAD) / img.height);
+      img.setScale(scale);
+      img.setTint(rain ? darken(RAVINE_TINT[season], 0.6) : RAVINE_TINT[season]);
+      this.panorama = img;
+      this.applyScroll();
+      this.addPrecipitation(season, rain);
+      return;
+    }
     const base = PALETTES[season];
     const dk = (t: [number, number, number]): [number, number, number] => (rain ? [darken(t[0]), darken(t[1]), darken(t[2])] : t);
     const pal: Palette = { sky: rain ? RAIN_SKY : base.sky, far: dk(base.far), mid: dk(base.mid), near: dk(base.near) };
@@ -147,6 +172,10 @@ export class BackgroundScene extends Phaser.Scene {
     this.layers.push(this.layer(`bg_mid_${tag}_${VIEW_H}`, pal.mid, 23, 195, 30, 5, false, 0.3));
     this.layers.push(this.layer(`bg_near_${tag}_${VIEW_H}`, pal.near, 37, 228, 18, 9, false, 0.6));
     this.applyScroll();
+    this.addPrecipitation(season, rain);
+  }
+
+  private addPrecipitation(season: Season, rain: boolean) {
     if (rain) {
       const r = rnd(9);
       for (let i = 0; i < 110; i++) {
@@ -215,6 +244,13 @@ export class BackgroundScene extends Phaser.Scene {
     const { scrollX, scrollY, worldHeight } = this.source;
     const rangeY = Math.max(1, worldHeight - viewH);
     const vy = Phaser.Math.Clamp(scrollY / rangeY, 0, 1); // 0 = top of world, 1 = bottom
+    if (this.panorama) {
+      const p = this.panorama;
+      const extraX = Math.max(0, p.displayWidth - VIEW_W);
+      const extraY = Math.max(0, p.displayHeight - viewH);
+      p.x = -Math.round(Phaser.Math.Clamp(scrollX * 0.05, 0, extraX));
+      p.y = -Math.round(extraY * vy);
+    }
     for (const l of this.layers) {
       l.sprite.tilePositionX = Math.round(scrollX * l.factor);
       // shift within [-PAD, 0] so the padded bottom always covers the view

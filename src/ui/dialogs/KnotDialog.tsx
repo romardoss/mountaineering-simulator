@@ -1,10 +1,11 @@
-// Knot selection (§13.4): all knots, grouped by category, names as text (no knot art yet).
+// Knot selection (§13.4): all knots, grouped by category; tiles show the knot art (if any) with the name under it.
 import { useState } from "preact/hooks";
 import { t } from "../../i18n/i18n";
 import { data, engine, session } from "../../app/store";
 import { controlFor, type KnotEvalInput } from "../../engine/knots/evaluate";
 import type { KnotChoice, KnotContext } from "../../engine/model/types";
 import type { KnotCategory } from "../../engine/data/types";
+import { assetUrl } from "../../game/assets";
 import { Modal, Msg } from "../components/common";
 import { formatKey, knotName } from "../format";
 import "../game.css";
@@ -50,12 +51,15 @@ export function KnotDialog(props: KnotDialogProps) {
             <div class="knot-tiles">
               {data.knots
                 .filter((k) => k.category === cat)
-                .map((k) => (
-                  <button class="knot-tile" aria-pressed={knotId === k.id} onClick={() => pick(k.id)}>
-                    {knotName(k.id)}
-                    <small>{t(`category.${k.category}`)}</small>
-                  </button>
-                ))}
+                .map((k) => {
+                  const img = assetUrl(k.icon);
+                  return (
+                    <button class={img ? "knot-tile" : "knot-tile no-art"} aria-pressed={knotId === k.id} onClick={() => pick(k.id)}>
+                      {img && <img src={img} alt="" aria-hidden="true" />}
+                      <span>{knotName(k.id)}</span>
+                    </button>
+                  );
+                })}
             </div>
           </div>
         ))}

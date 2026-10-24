@@ -1,8 +1,8 @@
 // Hill geometry (§5.2): 1D path s along the slope, mapped to 2D world metres.
-// The start zone, optional summit zone and finish zone are flat.
+// The start zone, optional summit / ravine-bottom zone and finish zone are flat.
 import type { BasePoint, HillConfig, Obstacle, Position, Section, Surface } from "../model/types";
 
-export type Zone = "start" | "summit" | "finish" | "slope";
+export type Zone = "start" | "summit" | "bottom" | "finish" | "slope";
 
 export interface Segment2D {
   s0: number;
@@ -26,6 +26,8 @@ export interface HillGeometry {
   finishStart: number;
   startZoneEnd: number;
   summit: { s0: number; s1: number } | null;
+  /** Ravine bottom (descent_ascent, CR-52). */
+  bottom: { s0: number; s1: number } | null;
   heightGain: number;
   minY: number;
   maxY: number;
@@ -56,10 +58,17 @@ export function basePointsOf(hill: HillConfig): BasePoint[] {
 export function normaliseSections(hill: HillConfig): Section[] {
   const out: Section[] = [];
   let s = hill.startZoneM;
-  const up: "up" | "down" = hill.routeType === "descent" ? "down" : "up";
+  const first: "up" | "down" = hill.routeType === "descent" || hill.routeType === "descent_ascent" ? "down" : "up";
   for (const c of hill.sections) {
-    out.push({ ...c, direction: up, startS: s });
+    out.push({ ...c, direction: first, startS: s });
     s += c.lengthM;
+  }
+  if (hill.routeType === "descent_ascent") {
+    s += hill.bottomZoneM ?? 4;
+    for (const c of hill.ascentSections ?? []) {
+      out.push({ ...c, direction: "up", startS: s });
+      s += c.lengthM;
+    }
   }
   if (hill.routeType === "ascent_descent") {
     s += hill.summitZoneM ?? 6;
@@ -86,12 +95,16 @@ export function buildHillGeometry(hill: Obstacle): HillGeometry {
   };
   push(0, hill.startZoneM, 0, 0, null, "start");
   let summit: HillGeometry["summit"] = null;
-  const ascentCount = hill.sections.length;
+  let bottom: HillGeometry["bottom"] = null;
+  const firstCount = hill.sections.length;
+  const twoSided = hill.routeType === "ascent_descent" || hill.routeType === "descent_ascent";
   sections.forEach((sec, i) => {
-    if (hill.routeType === "ascent_descent" && i === ascentCount) {
+    if (twoSided && i === firstCount && i > 0) {
       const s0 = sections[i - 1].startS + sections[i - 1].lengthM;
-      push(s0, sec.startS, 0, 0, null, "summit");
-      summit = { s0, s1: sec.startS };
+      const zone: Zone = hill.routeType === "descent_ascent" ? "bottom" : "summit";
+      push(s0, sec.startS, 0, 0, null, zone);
+      if (zone === "bottom") bottom = { s0, s1: sec.startS };
+      else summit = { s0, s1: sec.startS };
     }
     push(sec.startS, sec.startS + sec.lengthM, sec.angleDeg, sec.direction === "up" ? 1 : -1, sec, "slope");
   });
@@ -109,6 +122,7 @@ export function buildHillGeometry(hill: Obstacle): HillGeometry {
     finishStart,
     startZoneEnd: hill.startZoneM,
     summit,
+    bottom,
     heightGain: gain,
     minY: Math.min(...ys),
     maxY: Math.max(...ys),
@@ -143,7 +157,31 @@ export function zoneAt(geo: HillGeometry, s: number): Zone {
   if (s <= geo.startZoneEnd) return "start";
   if (s >= geo.finishStart) return "finish";
   if (geo.summit && s >= geo.summit.s0 && s <= geo.summit.s1) return "summit";
+  if (geo.bottom && s >= geo.bottom.s0 && s <= geo.bottom.s1) return "bottom";
   return "slope";
+}
+
+/** Ravine (CR-52): the перила span the gap between the start and the finish bank. */
+export function isRavine(hill: HillConfig): boolean {
+  return hill.type === "ravine";
+}
+
+/** Bank of a ravine at s: start or finish zone; null inside the gap. */
+export function bankAt(geo: HillGeometry, s: number): "start" | "finish" | null {
+  const z = zoneAt(geo, s);
+  return z === "start" || z === "finish" ? z : null;
+}
+
+/** Path position under world x (x grows with s), by bisection. */
+export function sAtWorldX(geo: HillGeometry, x: number): number {
+  let lo = 0;
+  let hi = geo.totalLength;
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2;
+    if (toWorld(geo, mid).x < x) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
 }
 
 export function isSafeZone(geo: HillGeometry, s: number): boolean {
@@ -173,6 +211,7 @@ export function downhillDir(geo: HillGeometry, s: number): -1 | 1 {
   const after = segmentAt(geo, g.s1 + 0.01);
   if (g.zone === "start") return after.sign === -1 ? 1 : -1;
   if (g.zone === "finish") return before.sign === 1 ? -1 : 1;
+  if (g.zone === "bottom") return 1; // the lowest point: any direction climbs
   return before.sign === 1 ? 1 : -1; // summit: descent side
 }
 

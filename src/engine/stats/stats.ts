@@ -1,6 +1,6 @@
 // End-of-game statistics (§16).
 import type { GameData } from "../data/types";
-import { geoOf, itemPos } from "../model/selectors";
+import { geoOf, itemPos, ravineOf } from "../model/selectors";
 import type { GameState, ItemId, StatsCounters } from "../model/types";
 
 export interface Stats extends StatsCounters {
@@ -8,6 +8,17 @@ export interface Stats extends StatsCounters {
   simTimeS: number;
   /** Items not with the team in the finish zone (§9.2.6). */
   itemsLeft: { id: ItemId; type: string; s: number }[];
+  /** Ravine score (CR-58): points lost for equipment left behind and for crossings on sagging перила; null on hills. */
+  penalties: Penalties | null;
+}
+
+export interface Penalties {
+  items: { id: ItemId; type: string; points: number }[];
+  sagCrossings: number;
+  sagPoints: number;
+  total: number;
+  score: number;
+  maxScore: number;
 }
 
 /** An item is "left on the hill" if it is not carried/worn and lies outside the finish zone. */
@@ -29,11 +40,23 @@ export function itemsLeftOnHill(state: GameState): Stats["itemsLeft"] {
   return out;
 }
 
-export function computeStats(_data: GameData, state: GameState): Stats {
+export function penaltiesOf(data: GameData, state: GameState, itemsLeft: Stats["itemsLeft"]): Penalties | null {
+  if (!ravineOf(state)) return null;
+  const sc = data.ravine.score;
+  const items = itemsLeft.map((i) => ({ id: i.id, type: i.type, points: sc.lostItemPoints[i.type] ?? sc.lostItemPoints.default ?? 0 }));
+  const sagCrossings = state.stats.mistakes.filter((m) => m.key === "summary.traverse_sag").length;
+  const sagPoints = sagCrossings * sc.sagPoints;
+  const total = items.reduce((a, i) => a + i.points, 0) + sagPoints;
+  return { items, sagCrossings, sagPoints, total, score: Math.max(0, sc.base - total), maxScore: sc.base };
+}
+
+export function computeStats(data: GameData, state: GameState): Stats {
+  const itemsLeft = itemsLeftOnHill(state);
   return {
     ...structuredClone(state.stats),
     outcome: state.outcome,
     simTimeS: state.simTimeS,
-    itemsLeft: itemsLeftOnHill(state),
+    itemsLeft,
+    penalties: penaltiesOf(data, state, itemsLeft),
   };
 }

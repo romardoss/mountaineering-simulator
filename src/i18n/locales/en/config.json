@@ -19,7 +19,7 @@
   "ui.cfg.obstacle.rock": "Vertical rock",
   "ui.cfg.obstacle.rock.desc": "Climbing on lower belay and rappelling.",
   "ui.cfg.obstacle.ravine": "Ravine",
-  "ui.cfg.obstacle.ravine.desc": "A Tyrolean traverse across a gap.",
+  "ui.cfg.obstacle.ravine.desc": "Belayed descent, a fixed rope tensioned with a pulley, escorted crossing and retrieval.",
   "ui.cfg.obstacle.river": "River",
   "ui.cfg.obstacle.river.desc": "Wading across with team belay.",
   "ui.cfg.obstacle.soon": "Coming soon",
@@ -105,9 +105,7 @@
   "ui.cfg.eq.control.none": "no back-up",
   "ui.cfg.eq.control.single": "single",
   "ui.cfg.eq.control.double": "double",
-  "ui.cfg.eq.locking": "locking",
   "ui.cfg.eq.locking_short": "lock.",
-  "ui.cfg.eq.nonlocking_short": "non-lock.",
   "ui.cfg.eq.shape": "Shape",
   "ui.cfg.eq.shape.hms": "pear-shaped",
   "ui.cfg.eq.shape.d": "D-shaped",
@@ -185,5 +183,8 @@
   "ui.cfg.hill.auto_tree_spots": "Every large tree is a base spot automatically (a paler flag on the preview).",
   "ui.cfg.eq.stock_hint": "This is the prepared team stock. Hand it out in the member columns («+ Take…», − / +).",
   "ui.cfg.eq.take": "Take gear: {member}",
-  "ui.cfg.eq.take_one": "Take…"
+  "ui.cfg.eq.take_one": "Take…",
+  "ui.cfg.lib.select_title_ravine": "Choose a ravine",
+  "ui.cfg.lib.select_hint_ravine": "Pick one of the predefined ravines.",
+  "ui.cfg.hill.depth": "Depth: {m} m"
 }
